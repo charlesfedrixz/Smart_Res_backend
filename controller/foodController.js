@@ -2,6 +2,7 @@ const Food = require("../models/foodModels");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const { validationResult } = require("express-validator");
 
 function getUserData(headers) {
   // Split the Bearer token
@@ -172,10 +173,64 @@ const searchFood = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+//edit food
+const editFood = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { userId } = getUserData(req.headers);
+
+  console.log(userId);
+  const { id, name, description, category, price } = req.body;
+  const imagePath = req.file?.filename;
+  console.log(id, name, description, category, price);
+  if (!id || !name || !description || !category || !price) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Please provide all fields." });
+  }
+  console.log(id, name, description, category, price);
+  try {
+    const food = await Food.findById(id);
+    if (!food) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Food not found" });
+    }
+    console.log(food);
+    if (food.userId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to edit this food item",
+      });
+    }
+
+    const updatedData = { name, description, category, price };
+    if (imagePath) {
+      fs.unlink(`uploads/${food.image}`, () => {});
+      updatedData.image = imagePath;
+    }
+    console.log(updatedData);
+    const updatedFood = await Food.findByIdAndUpdate(id, updatedData, {
+      new: true,
+    });
+    console.log("object update");
+    return res.status(200).json({
+      success: true,
+      updatedFood,
+      message: "Food updated successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
 module.exports = {
   uploadFood: uploadFood,
   listFood: listFood,
   removedFood: removedFood,
   getFoodByCategory: getFoodByCategory,
   searchFood: searchFood,
+  editFood: editFood,
 };

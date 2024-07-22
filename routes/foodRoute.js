@@ -5,6 +5,7 @@ const {
   removedFood,
   getFoodByCategory,
   searchFood,
+  editFood,
 } = require("../controller/foodController");
 const multer = require("multer");
 // const path = require('path');
@@ -26,4 +27,5 @@ foodRoutes.get("/foodList", listFood);
 foodRoutes.delete("/remove", removedFood);
 foodRoutes.get("/search", getFoodByCategory);
 foodRoutes.get("/find", searchFood);
+foodRoutes.put("/edit", upload.single("image"), editFood);
 module.exports = { foodRoutes: foodRoutes };
