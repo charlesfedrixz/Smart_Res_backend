@@ -24,20 +24,31 @@ const createCategory = asynchandler(async (req, res) => {
         message: "Invalid token please login again...",
       });
     }
-    const { category } = req.query;
+    const { category } = req.body;
+    console.log(category);
     if (!category) {
       return res
         .status(400)
         .json({ success: false, message: "Provide a category..." });
     }
-    const userId = token.id;
-    const userEmail = token.email;
+    const categoryFind = await Category.findOne({ category });
+    {
+      if (categoryFind) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Category is already created..." });
+      }
+    }
+    // const userId = token.id;
+    // const userEmail = token.email;
+    console.log("object");
     const newCategory = await Category.create({ category });
+    console.log(newCategory);
     return res.status(201).json({
       success: true,
       message: "Category created success",
       data: newCategory,
-      user: { id: userId, email: userEmail },
+      // user: { id: userId, email: userEmail },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server Error" });
@@ -65,13 +76,13 @@ const getCategory = asynchandler(async (req, res) => {
         message: "Invalid token please login again...",
       });
     }
-    const { category } = req.query;
-    if (!category) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide category..." });
-    }
-    const list = await Category.findOne({ category });
+    // const { category } = req.query;
+    // if (!category) {
+    //   return res
+    //     .status(400)
+    //     .json({ success: false, message: "Please provide category..." });
+    // }
+    const list = await Category.find({});
     if (!list) {
       return res
         .status(400)

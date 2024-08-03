@@ -4,35 +4,39 @@ const Food = require("./foodModels");
 
 const orderSchema = new mongoose.Schema(
   {
-    customerId: { type: mongoose.ObjectId, ref: "Customers", required: true },
+    customerId: {
+      type: mongoose.Types.ObjectId,
+      ref: "Customers",
+      required: true,
+    },
     // tableNumber: { type: mongoose.ObjectId, ref: "Table", required: true },
     foodItems: [
       {
-        foodId: { type: mongoose.ObjectId, ref: "Food", required: true },
+        foodId: { type: mongoose.Types.ObjectId, ref: "Food", required: true },
         quantity: { type: Number, min: 1, required: true },
-        status: {
-          type: String,
-          required: true,
-          enum: [
-            "Your order is being prepared ...",
-            "Your order is ready...",
-            "Food Processing...",
-            "Completed",
-          ],
-          default: "Your order is being prepared ...",
-        },
+        // status: {
+        //   type: String,
+        //   required: true,
+        //   enum: [
+        //     "Preparing...",
+        //     "Ready...",
+        //     "Processing...",
+        //     "Completed",
+        //     "Your order is being prepared ...",
+        //     "Your order is ready...",
+        //     "Food Processing...",
+        //     "Completed",
+        //   ],
+        //   default: "Preparing...",
+        // },
       },
     ],
     totalAmount: { type: Number, required: true },
     status: {
       type: String,
       required: true,
-      enum: [
-        "Your order is being prepared ...",
-        "Your order is ready...",
-        "Completed",
-      ],
-      default: "Your order is being prepared ...",
+      enum: ["Preparing...", "Ready...", "Processing...", "Completed"],
+      default: "Preparing...",
     },
 
     // createdAt: { type: Date, default: Date.now },
@@ -99,8 +103,9 @@ orderSchema.methods.updateStatusPayment = async function (paid) {
 
 orderSchema.methods.updateStatusOrder = async function (newStatus) {
   const validStatuses = [
-    "Your order is being prepared ...",
-    "Your order is ready...",
+    "Preparing...",
+    "Ready...",
+    "Processing...",
     "Completed",
   ];
 

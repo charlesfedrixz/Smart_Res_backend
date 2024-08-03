@@ -11,7 +11,7 @@ function getUserData(headers) {
       customerId: null,
     };
   const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-  if (!verifiedToken)
+  if (!verifiedToken || !verifiedToken.user)
     return {
       customerId: null,
     };
@@ -20,11 +20,36 @@ function getUserData(headers) {
   };
 }
 
+function getAdminData(headers) {
+  // Split the Bearer token
+  const token = headers.authorization.split(" ")[1];
+  if (!token) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Token header missing", userId: null });
+  }
+  console.log(token);
+  const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+  console.log(verifiedToken);
+
+  if (!verifiedToken)
+    return {
+      success: false,
+      message: "Invalid token",
+      userId: null,
+    };
+  return {
+    success: true,
+    message: "Token verified successfully",
+    userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
+  };
+}
+
 const createOrder = async (req, res) => {
+  const { foodItems } = req.body;
+  const { userData } = getUserData(req.headers);
   try {
-    const { foodItems } = req.body;
-    const { customerId } = getUserData(req.headers);
-    if (!customerId)
+    if (!userData.customerId)
       return res.status(403).json({ msg: "User Expired Please log in again" });
 
     if (!foodItems) {
@@ -63,21 +88,31 @@ const deleteOrder = async (req, res, next) => {
   const { orderId } = req.body;
 
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
-    return res.status(400).json({ msg: "Invalid order ID." });
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid order ID." });
   }
 
   try {
     const order = await Order.findById(orderId);
 
     if (!order) {
-      return res.status(404).json({ msg: "Order not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found." });
     }
 
     await Order.deleteOne({ _id: orderId });
 
-    res.status(200).json({ msg: "Order deleted successfully." });
+    return res
+      .status(200)
+      .json({ success: true, message: "Order deleted successfully." });
   } catch (error) {
-    res.status(500).json({ msg: "Error deleting order", error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Error deleting order",
+      error: error.message,
+    });
   }
 
   if (next) {
@@ -151,18 +186,65 @@ const tableOrder = async (req, res, next) => {
   }
 };
 
+//admin order list
+const adminOrderList = async (req, res) => {
+  console.log("object");
+  try {
+    console.log("object");
+
+    const { userId } = getAdminData(req.headers);
+    console.log(userId);
+    if (!userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide token" });
+    }
+    const orderList = await Order.find()
+      .populate("customerId")
+      .populate("foodItems.foodId");
+    // const customerDetails = await customer.findById(orders.customerId);
+    // if (customerDetails) {
+    //   return res
+    //     .status(200)
+    //     .json({ success: true, message: "Customer details with success" });
+    // }
+    console.log("object");
+    return res.status(200).json({
+      success: true,
+      orderList,
+      message: "Customer Order listed with success ",
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
 const listOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find();
-
+    const orders = await Order.find()
+      .populate("customerId")
+      .populate("foodItems.foodId");
+    // .populate({ path: "customerId" })
+    // .populate({ path: "foodItems.foodId" });
+    // Detailed logging to debug
+    // orders.forEach((order) => {
+    //   if (!order.customerId) {
+    //     console.log(`Order with ID ${order._id} has a null customerId`);
+    //   }
+    // });
     if (!orders.length) {
-      return res.status(404).json({ msg: "No orders found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "No orders found." });
     }
-    res.status(200).json({ orders });
+    res
+      .status(200)
+      .json({ orders, success: true, message: "Order listed successfully" });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ msg: "Error fetching orders", error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching orders",
+      error: error.message,
+    });
   }
 
   if (next) {
@@ -173,6 +255,10 @@ const listOrders = async (req, res, next) => {
 const customerOrderlist = async (req, res) => {
   try {
     const { customerId } = getUserData(req.headers);
+    if (!customerId)
+      return res
+        .status(403)
+        .json({ success: false, message: "User Expired Please log in again" });
     console.log("Customer ID:", customerId);
 
     // Retrieve orders for the customer and populate food details
@@ -204,7 +290,7 @@ const customerOrderlist = async (req, res) => {
       };
     });
     // Respond with the order and food details
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       orders: ordersWithFoodDetails,
       message: "Customer order listed successfully",
@@ -406,4 +492,5 @@ module.exports = {
   customerOrderlist: customerOrderlist,
   addOrder: addOrder,
   updateOrderPayment: updateOrderPayment,
+  adminOrderList: adminOrderList,
 };

@@ -10,6 +10,7 @@ const {
   customerOrderlist,
   addOrder,
   updateOrderPayment,
+  adminOrderList,
 } = require("../controller/orderController"); // Ensure correct path
 
 const order = express.Router();
@@ -23,6 +24,7 @@ order.post("/foodStatus", updateFoodItemStatus);
 order.get("/customerlist", customerOrderlist);
 order.put("/addOrder", addOrder);
 order.put("/updatePayment", updateOrderPayment);
+order.get("/adminOrderList", adminOrderList);
 
 module.exports = {
   order: order,

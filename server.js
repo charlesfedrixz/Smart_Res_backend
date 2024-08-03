@@ -31,3 +31,10 @@ io.on("connection", (socket) => {
     console.log("customer disconnected");
   });
 });
+
+const port = 3000;
+app.listen(port, () => {
+  console.log(
+    `Socket Server for Smart Restaurant is running on http://localhost:${port}`
+  );
+});

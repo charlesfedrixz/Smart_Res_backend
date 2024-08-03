@@ -27,5 +27,5 @@ foodRoutes.get("/foodList", listFood);
 foodRoutes.delete("/remove", removedFood);
 foodRoutes.get("/search", getFoodByCategory);
 foodRoutes.get("/find", searchFood);
-foodRoutes.put("/edit", upload.single("image"), editFood);
+foodRoutes.put("/edit/:id", upload.single("image"), editFood);
 module.exports = { foodRoutes: foodRoutes };

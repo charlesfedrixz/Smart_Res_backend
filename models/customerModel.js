@@ -6,8 +6,8 @@ const customerSchema = new mongoose.Schema(
       required: true,
     },
     mobileNumber: {
-     type: Number,
-      required: true, 
+      type: Number,
+      required: true,
       unique: true,
     },
     otp: {

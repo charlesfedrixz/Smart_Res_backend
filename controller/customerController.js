@@ -4,13 +4,13 @@ const jwt = require("jsonwebtoken");
 const { throwError } = require("../utils/errorHandler");
 const crypto = require("crypto");
 const twilio = require("twilio");
+const { Server } = require("http");
+const Order = require("../models/orderModels");
 
 const countryCode = "+91";
-
 const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
-
 const accountSid = process.env.TWILIO_ACCOUNT_SID; // Your Account SID from www.twilio.com/console
 const authToken = process.env.TWILIO_AUTH_TOKEN; // Your Auth Token from www.twilio.com/console
 const client = twilio(accountSid, authToken);
@@ -22,267 +22,168 @@ async function sendOTPSMS(mobileNumber, otp) {
       ""
     )}`;
     const message = await client.messages.create({
-      body: `Your OTP code is ${otp}`,
+      body: `Smart Restaurant verification OTP code: ${otp}.
+              Code is valid for 5 minutes.
+               - Smart Restaurant Team `,
       from: process.env.TWILIO_PHONE_NUMBER, // Your Twilio phone number
       to: formattedPhoneNumber,
     });
-
     console.log(`Message sent: ${message.sid}`);
   } catch (error) {
-    console.error("Error sending SMS:", error);
+    console.error(error);
   }
 }
-const sendSMSNotification = (mobileNumber, newStatus) => {
-  return client.messages.create({
-    body: newStatus,
-    from: process.env.TWILIO_PHONE_NUMBER,
-    to: mobileNumber,
-  });
-};
-
-const register = asyncHandler(async (req, res) => {
-  const { mobileNumber, currentTableNumber } = req.body;
-  console.log(mobileNumber, currentTableNumber);
-  if (!mobileNumber || !currentTableNumber) {
-    return res
-      .status(400)
-      .json({ msg: "Please provide the mobile number and table number. " });
-  }
-
-  const table = await customer.findOne({ currentTableNumber });
-  const user = await customer.findOne({ mobileNumber });
-
-  if (table) {
-    res.status(200).json({
-      success: true,
-      msg: `Table ${currentTableNumber} is already exist. So, Scan another Table...  `,
-    });
-  }
-
-  // If user is already exist
-  if (user) {
-    user.currentTableNumber = currentTableNumber;
-    //await user.save();
-
-    const payload = {
-      userData: {
-        id: user.id,
-        mobileNumber: user.mobileNumber,
-        currentTableNumber,
-      },
-    };
-    const token = jwt.sign(payload, process.env.JWT_SECRET);
-    console.log(token);
-    // user.isVerified = true;
-    // user.otp = undefined;
-    // user.otpExpire = undefined;
-    await user.save();
-    res.status(200).json({
-      message: "login with success...",
-      success: true,
-      token,
-    });
-    console.log(res);
-    // return res.status(200).json({
-    //   msg: "Mobile number is already registered.",
-    //   token,
-    //   success: true,
-    // });
-  }
-
-  // const otp = generateOTP();
-  // user.otp = otp;
-  // user.otpExpire = Date.now() + 3600000;
-  // user.currentTableNumber = currentTableNumber;
-  // await user.save();
-  //   await sendOTPSMS(mobileNumber, otp);
-  //   return res.status(200).json({ msg: `OTP sent to your ${mobileNumber}.` , success: true});
-
-  // }
-
-  // * There is no existing user
-  const otp = generateOTP();
-
-  await customer.create({
-    otp,
-    otpExpire: Date.now() + 1000 * 60 * 2,
-    mobileNumber,
-    currentTableNumber,
-  });
-  // user = new customer({  mobileNumber, currentTableNumber });
-  // user.otp = otp;
-  // user.otpExpire = Date.now() + 3600000; // OTP valid for 1 hour
-
+const resendOtp = asyncHandler(async (req, res) => {
   try {
-    // await user.save();
-    await sendOTPSMS(mobileNumber, otp);
-    return res.status(200).json({
-      msg: `OTP sent to your mobile number: ${mobileNumber}.`,
-      success: true,
-      token: null,
+    const { mobileNumber } = req.body;
+    if (!mobileNumber) {
+      return res.status(400).json({ msg: "Please provide a mobile number." });
+    }
+    const user = await customer.findOne({
+      mobileNumber,
     });
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
-    return res.status(500).json({
-      success: false,
-      message: "Error registering user or sending OTP. Please try again.",
-    });
-
-    //throwError("Error registering user or sending OTP. Please try again.", 400);
-
-    // return res.status(400).json({
-    //   msg: "Error registering user or sending OTP. Please try again.",
-    // });
-  }
-});
-
-const verifyOtp = async (req, res) => {
-  const { mobileNumber, otp } = req.body;
-
-  try {
-    let user = await customer.findOne({ mobileNumber, otp });
-
     if (!user) {
       return res
         .status(400)
-        .json({ msg: "User does not exist", token: null, success: false });
+        .json({ success: false, message: "User not found." });
     }
-    console.log(`Current Time: ${Date.now()}`);
-    console.log(`OTP Expiry Time: ${user.otpExpire}`);
-    console.log(`Provided OTP: ${otp}`);
-    // console.log(`Stored OTP: ${user.otp}`);
-
-    if (user.otp !== otp || user.otpExpire < Date.now()) {
-      return res.status(400).json({ msg: "Invalid or expired OTP" });
-    }
-
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpire = undefined;
+    const otp = generateOTP();
+    user.isVerified = false;
+    user.otp = otp;
+    user.otpExpire = Date.now() + 1000 * 60 * 5;
     await user.save();
-    const payload = {
-      user: {
-        id: user.id,
-        phone: user.mobileNumber,
-      },
-    };
-    const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET
-      //, { expiresIn: "1h",}
-    );
-
-    res
-      .status(200)
-      .json({ msg: "OTP verified successfully", token, success: true });
-    console.log(token);
-  } catch (err) {
-    console.error(err.message);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
+    await sendOTPSMS(mobileNumber, otp);
+    return res.status(200).json({
+      success: true,
+      user,
+      message: "Resend OTP with success.",
     });
-    // throwError("Server error", 500);
-  }
-};
-
-const resendOtp = asyncHandler(async (req, res) => {
-  const { mobileNumber } = req.body;
-
-  if (!mobileNumber) {
-    return res
-      .status(400)
-      .json({ msg: "Please provide a mobile number and table number." });
-  }
-  // Please add an ERROR for invalid mobile number
-  const formattedMobileNumber = `${countryCode}${mobileNumber.replace(
-    /\D/g,
-    ""
-  )}`;
-  let user = await customer.findOne({ mobileNumber: formattedMobileNumber });
-
-  if (!user) {
-    return res.status(400).json({ msg: "User not found." });
-  }
-
-  const otp = generateOTP();
-  user.otp = otp;
-  user.otpExpire = Date.now() + 3600000; // OTP valid for 1 hour
-
-  try {
-    await user.save();
-    await sendOTPSMS(formattedMobileNumber, otp);
-    return res
-      .status(200)
-      .json({ msg: `New OTP sent to your +${formattedMobileNumber}.` });
   } catch (error) {
     console.error("Error sending SMS:", error);
     return res.status(500).json({
       success: false,
       message: "Server error",
     });
-    //throwError("Error resending OTP. Please try again later.", 500);
-
-    // return res
-    //   .status(500)
-    //   .json({ msg:  });
   }
 });
-
-// const deleteAccount = asyncHandler(async (req, res) => {
-//   const { mobileNumber } = req.body;
-//   console.log(mobileNumber);
-
-//   try {
-//     const user = await customer.findOne({
-//       mobileNumber,
-//     });
-//     console.log(user);
-//     if (!user) {
-//       return res.status(400).json({ msg: "User not found." });
-//     }
-
-//     await customer.deleteOne({ _id: user._id });
-
-//     return res
-//       .status(200)
-//       .json({ msg: "Account deleted successfully.", success: true });
-//   } catch (error) {
-//     console.error(error.message);
-//     throwError(" Server Error ", 500);
-//   }
-// });
 const deleteAccount = asyncHandler(async (req, res) => {
   const { currentTableNumber } = req.body;
   console.log(currentTableNumber);
-
   try {
     const user = await customer.findOne({
       currentTableNumber,
     });
     console.log(user);
     if (!user) {
-      return res.status(400).json({ msg: "User not found." });
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found." });
     }
-
+    await Order.deleteMany({ customerId: user._id });
     await customer.deleteOne({ _id: user._id });
-
-    return res
-      .status(200)
-      .json({ msg: "Account deleted successfully.", success: true });
+    return res.status(200).json({
+      message: "Account and associated orders deleted successfully.",
+      success: true,
+    });
   } catch (error) {
     console.error(error.message);
     return res.status(500).json({
       success: false,
       message: "Server error",
     });
-    //throwError(" Server Error ", 500);
   }
 });
+
+const mobileRegister = asyncHandler(async (req, res) => {
+  try {
+    const { mobileNumber, currentTableNumber } = req.body;
+    if (!mobileNumber || !currentTableNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "provide mobile number and table number",
+      });
+    }
+    const customerFind = await customer.findOne({ mobileNumber });
+    if (customerFind) {
+      const otp = generateOTP();
+      customerFind.currentTableNumber == currentTableNumber;
+      customerFind.otp == otp;
+      await customerFind.save();
+
+      //send otp function
+      await sendOTPSMS(mobileNumber, otp);
+      return res.status(200).json({
+        success: true,
+        token: null,
+        message: "OTP is send and register with success for existing user ",
+      });
+    }
+    const otp = generateOTP();
+    const newCustomer = await customer.create({
+      mobileNumber: mobileNumber,
+      currentTableNumber: currentTableNumber,
+      otp: otp,
+      otpExpire: Date.now() + 1000 * 60 * 5,
+    });
+    //send otp function
+    await sendOTPSMS(mobileNumber, otp);
+    return res.status(200).json({
+      success: true,
+      Data: newCustomer,
+      token: null,
+      message: "Register a new customer and OTP is send with success",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+const OtpVerify = async (req, res) => {
+  try {
+    const { mobileNumber, otp } = req.body;
+    if (!mobileNumber || !otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide the field." });
+    }
+    const findCustomer = await customer.findOne({ mobileNumber });
+    if (!findCustomer) {
+      return res.status(200).json({ success: false, message: "No Data found" });
+    }
+    if (!findCustomer.otp == otp && findCustomer.otpExpire < Date.now()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or Expired OTP." });
+    }
+    findCustomer.isVerified = true;
+    findCustomer.otp = undefined;
+    findCustomer.otpExpire = undefined;
+    await findCustomer.save();
+
+    const payload = {
+      user: {
+        id: findCustomer._id,
+        mobileNumber: findCustomer.mobileNumber,
+      },
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "5h",
+    });
+    // await sendSMSNotification(
+    //   mobileNumber,
+    //   `Smart Restaurant verified your ${mobileNumber} successfully.`
+    // );
+    return res
+      .status(200)
+      .json({ success: true, token, message: "OTP verified with success" });
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({ success: false, message: "Server Error" });
+  }
+};
 module.exports = {
-  register: register,
-  verifyOtp: verifyOtp,
   resendOtp: resendOtp,
-  sendSMSNotification: sendSMSNotification,
   deleteAccount: deleteAccount,
+  mobileRegister: mobileRegister,
+  OtpVerify: OtpVerify,
 };

@@ -3,6 +3,7 @@ const fs = require("fs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { validationResult } = require("express-validator");
+const Category = require("../models/categoryModels");
 
 function getUserData(headers) {
   // Split the Bearer token
@@ -32,13 +33,13 @@ const uploadFood = async (req, res) => {
   try {
     const { userId } = getUserData(req.headers);
     const { name, description, category, price } = req.body;
-    console.log(userId);
+    console.log("userId:", userId);
 
     let imagePath = req.file.filename; // File path after upload
-    console.log(name, description, category, price, imagePath);
+    console.log("field:", name, description, category, price, imagePath);
     if (!userId) {
       return res
-        .status(403)
+        .status(400)
         .json({ success: false, message: "User Expired Please log in again" });
     }
     if (!name || !description || !category || !price || !imagePath) {
@@ -46,7 +47,7 @@ const uploadFood = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Please provide all the field..." });
     }
-    console.log("object");
+
     // Save food details to MongoDB
     const newFood = await Food.create({
       name: name,
@@ -56,10 +57,13 @@ const uploadFood = async (req, res) => {
       image: imagePath,
       userId: userId,
     });
+    // .populate("categoryId");
     console.log(newFood);
-    return res
-      .status(201)
-      .json({ success: true, newFood, message: "Food uploaded successfully" });
+    return res.status(200).json({
+      success: true,
+      newFood,
+      message: "Food uploaded successfully",
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
@@ -68,7 +72,7 @@ const uploadFood = async (req, res) => {
 const listFood = async (req, res) => {
   try {
     // const { userId } = getUserData(req.headers);
-    const foods = await Food.find({});
+    const foods = await Food.find({}).populate("userId", "email");
     // if (!userId) {
     //   return res
     //     .status(403)
@@ -183,9 +187,9 @@ const editFood = async (req, res) => {
   const { userId } = getUserData(req.headers);
 
   console.log(userId);
-  const { id, name, description, category, price } = req.body;
+  const { name, description, category, price } = req.body;
   const imagePath = req.file?.filename;
-  console.log(id, name, description, category, price);
+  const { id } = req.params;
   if (!id || !name || !description || !category || !price) {
     return res
       .status(400)
