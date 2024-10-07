@@ -296,7 +296,8 @@ const customerOrderlist = async (req, res) => {
           food: item.foodId,
           quantity: item.quantity,
         }));
-
+      console.log("Add order: ", newFooditems);
+      console.log("Old order: ", allFooditems);
       return {
         _id: order._id,
         customerId: order.customerId,
@@ -536,8 +537,8 @@ const addOrder = async (req, res) => {
     }
 
     foodItems.forEach((item) => {
-      const existingFooditem = order.foodItems.find((foodItem) =>
-        foodItem.foodId.equals(item.id)
+      const existingFooditem = order.foodItems.find(
+        (foodItem) => foodItem.foodId && foodItem.foodId.equals(item.id)
       );
       if (existingFooditem) {
         existingFooditem.quantity += item.quantity;
