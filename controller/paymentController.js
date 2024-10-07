@@ -1,8 +1,18 @@
 require("dotenv").config();
 const Razorpay = require("razorpay");
 const Order = require("../models/orderModels");
+<<<<<<< HEAD
 const crypto = require("crypto");
 const Invoice = require("../models/invoicemodel");
+=======
+<<<<<<< HEAD
+const crypto = require("crypto");
+const Invoice = require("../models/invoicemodel");
+=======
+const { Invoice } = require("../models/invoicemodel");
+const crypto = require("crypto");
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
+>>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 
 const payment = async (req, res) => {
   try {
@@ -27,6 +37,13 @@ const payment = async (req, res) => {
       currency: "INR",
       orderId,
     });
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
+>>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
     const options = {
       amount: currentOrder.totalAmount * 100,
       currency: "INR",
@@ -85,7 +102,10 @@ const paymentVerify = async (req, res) => {
         return res
           .status(400)
           .json({ success: false, message: "Invoice not found" });
+<<<<<<< HEAD
 
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       await currentInvoice.updateStatus("Paid");
       const currentOrder = await Order.findById(currentInvoice.orderId);
       console.log(currentOrder, "currentorder");
@@ -93,10 +113,15 @@ const paymentVerify = async (req, res) => {
         return res
           .status(400)
           .json({ success: false, message: "order not found" });
+<<<<<<< HEAD
 
       await currentOrder.updateStatusPayment(true);
       await currentOrder.updatePaymentMode("Online");
       // await currentInvoice.updateStatus("Paid");
+=======
+      await currentOrder.updateStatusPayment(true);
+      await currentOrder.updatePaymentMode("Online");
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 
       console.log("final");
       return res.status(200).json({
@@ -104,11 +129,16 @@ const paymentVerify = async (req, res) => {
         message: "payment verified successfully",
       });
     } else {
+<<<<<<< HEAD
       await Invoice.updateStatus("Processing");
+=======
+      await Invoice.updateStatus("pending");
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       await Order.updatePaymentStatus(false);
       return res.status(400).json({ message: "Invalid signature sent" });
     }
   } catch (error) {
+<<<<<<< HEAD
     return res.status(500).json({ message: "Something went wrong", error });
   }
 };
@@ -202,4 +232,16 @@ module.exports = {
   payment: payment,
   paymentNew: paymentNew,
   cashPayment: cashPayment,
+<<<<<<< HEAD
+=======
+=======
+    return res.status(500).json({ message: "Something went wrong" });
+  }
+};
+
+module.exports = {
+  paymentVerify: paymentVerify,
+  payment: payment,
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
+>>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 };

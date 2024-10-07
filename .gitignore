@@ -1,4 +1,13 @@
 node_modules
 .env
 .vscode
+<<<<<<< HEAD
 cred.json
+=======
+<<<<<<< HEAD
+uploads/*
+cred.json
+=======
+uploads/*
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
+>>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
