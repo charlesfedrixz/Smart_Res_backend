@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 const Food = require("./foodModels");
+<<<<<<< HEAD
 const { Invoice } = require("./invoicemodel");
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 //const sendSMSNotification = require("../utils/sms")
 
 const orderSchema = new mongoose.Schema(
@@ -10,10 +13,15 @@ const orderSchema = new mongoose.Schema(
       ref: "Customers",
       required: true,
     },
+<<<<<<< HEAD
+=======
+    // tableNumber: { type: mongoose.ObjectId, ref: "Table", required: true },
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     foodItems: [
       {
         foodId: { type: mongoose.Types.ObjectId, ref: "Food", required: true },
         quantity: { type: Number, min: 1, required: true },
+<<<<<<< HEAD
         isNewItem: { type: Boolean, default: false },
       },
     ],
@@ -25,6 +33,34 @@ const orderSchema = new mongoose.Schema(
       enum: ["Preparing", "Ready", "Processing", "Completed"],
       default: "Processing",
     },
+=======
+        // status: {
+        //   type: String,
+        //   required: true,
+        //   enum: [
+        //     "Preparing...",
+        //     "Ready...",
+        //     "Processing...",
+        //     "Completed",
+        //     "Your order is being prepared ...",
+        //     "Your order is ready...",
+        //     "Food Processing...",
+        //     "Completed",
+        //   ],
+        //   default: "Preparing...",
+        // },
+      },
+    ],
+    totalAmount: { type: Number, required: true },
+    status: {
+      type: String,
+      required: true,
+      enum: ["Preparing...", "Ready...", "Processing...", "Completed"],
+      default: "Preparing...",
+    },
+
+    // createdAt: { type: Date, default: Date.now },
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     isRated: { type: Boolean, default: false },
     payment_mode: {
       type: String,
@@ -82,14 +118,27 @@ orderSchema.methods.updatePaymentMode = async function (payment_mode) {
 orderSchema.methods.updateStatusPayment = async function (paid) {
   if (paid) {
     this.payment = "Paid";
+<<<<<<< HEAD
     // await Invoice.updateStatus("Paid");
   } else this.payment = "Unpaid";
   // await Invoice.updateStatus("Pending");
+=======
+  } else this.payment = "Unpaid";
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   await this.save();
 };
 
 orderSchema.methods.updateStatusOrder = async function (newStatus) {
+<<<<<<< HEAD
   const validStatuses = ["Preparing", "Ready", "Processing", "Completed"];
+=======
+  const validStatuses = [
+    "Preparing...",
+    "Ready...",
+    "Processing...",
+    "Completed",
+  ];
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 
   if (!validStatuses.includes(newStatus)) {
     throw new Error(`Invalid status: ${newStatus}`);
@@ -98,9 +147,50 @@ orderSchema.methods.updateStatusOrder = async function (newStatus) {
   this.status = newStatus;
   await this.save();
 };
+<<<<<<< HEAD
 //order expire after 7 days
 orderSchema.index({ created: 1 }), { expireAfterSeconds: 7 * 24 * 60 * 60 };
 
+=======
+// Fetch customer phone number from the database
+// const customer = await mongoose.model("customer").findById(this.customerId);
+// if (customer && customer.mobileNumber) {
+//   const message = `Your order status has been updated to: ${newStatus}`;
+//   try {
+//     await sendSMSNotification(customer.mobileNumber, message);
+//   } catch (error) {
+//     console.error(`Failed to send SMS notification: ${error.message}`);
+//   }
+// }
+
+// orderSchema.methods.updateFoodItemStatus = async function (foodId, newStatus) {
+//   const validStatuses = [
+//     "Food Processing",
+//     "Ready for Delivery",
+//     "Completed",
+//     "Payment Pending",
+//     "Payment Done",
+//     "Food Unpaid",
+//     "Food Paid",
+//     "Cash Mode",
+//     "Online Mode",
+//   ];
+
+//   if (!validStatuses.includes(newStatus)) {
+//     throw new Error(`Invalid status: ${newStatus}`);
+//   }
+
+//   const foodItem = this.foodItems.find(
+//     (item) => item.foodId.toString() === foodId
+//   );
+//   if (!foodItem) {
+//     throw new Error(`Food item with ID ${foodId} not found in this order.`);
+//   }
+
+//   foodItem.status = newStatus;
+//   await this.save();
+// };
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 const Order = mongoose.model("Order", orderSchema);
 
 module.exports = Order;

@@ -1,5 +1,9 @@
 node_modules
 .env
 .vscode
+<<<<<<< HEAD
 uploads/*
 cred.json
+=======
+uploads/*
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080

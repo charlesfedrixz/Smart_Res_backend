@@ -13,6 +13,7 @@ const { auth } = require("../middleware/checkAuth");
 
 const foodRoutes = express.Router();
 //image storage engine
+<<<<<<< HEAD
 // const storage = multer.diskStorage({
 //   destination: "uploads",
 //   filename: (req, file, cb) => {
@@ -21,6 +22,15 @@ const foodRoutes = express.Router();
 // });
 
 const storage = multer.memoryStorage();
+=======
+const storage = multer.diskStorage({
+  destination: "uploads",
+  filename: (req, file, cb) => {
+    return cb(null, `${Date.now()} ${file.originalname}`);
+  },
+});
+
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 const upload = multer({ storage: storage });
 // Route to handle food upload
 foodRoutes.post("/uploadFood", upload.single("image"), uploadFood);

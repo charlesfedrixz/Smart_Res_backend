@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const Food = require("../models/foodModels");
 
 function getUserData(headers) {
+<<<<<<< HEAD
   const authHeader = headers?.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     console.error(
@@ -28,6 +29,22 @@ function getUserData(headers) {
     console.error("JWT verification error:", error.message);
     return { customerId: null }; // Invalid or malformed token
   }
+=======
+  // Bearer eyIijewkfneknasdflkasd4
+  const token = headers.authorization.split(" ")[1];
+  if (!token)
+    return {
+      customerId: null,
+    };
+  const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+  if (!verifiedToken || !verifiedToken.user)
+    return {
+      customerId: null,
+    };
+  return {
+    customerId: verifiedToken.user.id,
+  };
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 }
 
 function getAdminData(headers) {
@@ -38,9 +55,15 @@ function getAdminData(headers) {
       .status(400)
       .json({ success: false, message: "Token header missing", userId: null });
   }
+<<<<<<< HEAD
   // console.log(token);
   const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
   // console.log(verifiedToken);
+=======
+  console.log(token);
+  const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+  console.log(verifiedToken);
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 
   if (!verifiedToken)
     return {
@@ -56,6 +79,7 @@ function getAdminData(headers) {
 }
 
 const createOrder = async (req, res) => {
+<<<<<<< HEAD
   try {
     const { foodItems } = req.body;
     const userData = getUserData(req.headers);
@@ -67,6 +91,20 @@ const createOrder = async (req, res) => {
     }
     const order = new Order({
       customerId: userData?.customerId,
+=======
+  const { foodItems } = req.body;
+  const { userData } = getUserData(req.headers);
+  try {
+    if (!userData.customerId)
+      return res.status(403).json({ msg: "User Expired Please log in again" });
+
+    if (!foodItems) {
+      return res.status(400).json({ msg: "No food ordered..." });
+    }
+    console.log(customerId, foodItems);
+    const order = new Order({
+      customerId,
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       foodItems: foodItems.map((item) => ({
         foodId: new mongoose.Types.ObjectId(item.id),
         quantity: item.quantity,
@@ -107,8 +145,13 @@ const deleteOrder = async (req, res, next) => {
 
     if (!order) {
       return res
+<<<<<<< HEAD
         .status(200)
         .json({ success: true, message: "Order not found." });
+=======
+        .status(404)
+        .json({ success: false, message: "Order not found." });
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     }
 
     await Order.deleteOne({ _id: orderId });
@@ -199,15 +242,23 @@ const tableOrder = async (req, res, next) => {
 const adminOrderList = async (req, res) => {
   console.log("object");
   try {
+<<<<<<< HEAD
     // console.log("object");
 
     const { userId } = getAdminData(req.headers);
     // console.log(userId);
+=======
+    console.log("object");
+
+    const { userId } = getAdminData(req.headers);
+    console.log(userId);
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!userId) {
       return res
         .status(400)
         .json({ success: false, message: "Please provide token" });
     }
+<<<<<<< HEAD
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
@@ -220,6 +271,9 @@ const adminOrderList = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .exec()
+=======
+    const orderList = await Order.find()
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       .populate("customerId")
       .populate("foodItems.foodId");
     // const customerDetails = await customer.findById(orders.customerId);
@@ -228,7 +282,11 @@ const adminOrderList = async (req, res) => {
     //     .status(200)
     //     .json({ success: true, message: "Customer details with success" });
     // }
+<<<<<<< HEAD
     // console.log("object");
+=======
+    console.log("object");
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     return res.status(200).json({
       success: true,
       orderList,
@@ -240,6 +298,7 @@ const adminOrderList = async (req, res) => {
 };
 const listOrders = async (req, res, next) => {
   try {
+<<<<<<< HEAD
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
@@ -254,6 +313,11 @@ const listOrders = async (req, res, next) => {
       .populate("customerId")
       .populate("foodItems.foodId")
       .exec();
+=======
+    const orders = await Order.find()
+      .populate("customerId")
+      .populate("foodItems.foodId");
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     // .populate({ path: "customerId" })
     // .populate({ path: "foodItems.foodId" });
     // Detailed logging to debug
@@ -262,12 +326,21 @@ const listOrders = async (req, res, next) => {
     //     console.log(`Order with ID ${order._id} has a null customerId`);
     //   }
     // });
+<<<<<<< HEAD
     if (orders?.length === 0) {
       return res
         .status(200)
         .json({ success: true, message: "No orders found." });
     }
     return res
+=======
+    if (!orders.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No orders found." });
+    }
+    res
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       .status(200)
       .json({ orders, success: true, message: "Order listed successfully" });
   } catch (error) {
@@ -290,6 +363,7 @@ const customerOrderlist = async (req, res) => {
       return res
         .status(403)
         .json({ success: false, message: "User Expired Please log in again" });
+<<<<<<< HEAD
     // console.log("Customer ID:", customerId);
 
     // Retrieve orders for the customer and populate food details
@@ -316,6 +390,23 @@ const customerOrderlist = async (req, res) => {
           quantity: item.quantity,
         }));
 
+=======
+    console.log("Customer ID:", customerId);
+
+    // Retrieve orders for the customer and populate food details
+    const orders = await Order.find({ customerId }).populate(
+      "foodItems.foodId"
+    );
+    if (!orders.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No orders found." });
+    }
+    console.log("Orders retrieved:", orders);
+
+    // Format the response to include order details with populated food details
+    const ordersWithFoodDetails = orders.map((order) => {
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       return {
         _id: order._id,
         customerId: order.customerId,
@@ -324,8 +415,11 @@ const customerOrderlist = async (req, res) => {
         orderTotal: order.totalAmount,
         orderPaymentMode: order.payment_mode,
         orderPayment: order.payment,
+<<<<<<< HEAD
         allFooditems,
         newFooditems,
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 
         foodItems: order.foodItems.map((item) => ({
           food: item.foodId, // This now includes the full food document
@@ -347,6 +441,7 @@ const customerOrderlist = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 const updateOrderBySocket = async (orderId, newStatus, socket) => {
   try {
     const order = await Order.findById(orderId.trim());
@@ -442,6 +537,8 @@ const updateOrderPaymentBySocket = async (orderId, paid, socket) => {
   }
 };
 
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 const updateOrderStatus = async (req, res) => {
   try {
     const { orderId, newStatus } = req.body;
@@ -546,7 +643,10 @@ const updateFoodItemStatus = async (req, res) => {
 
 const getItemPriceById = async (foodId) => {
   try {
+<<<<<<< HEAD
     console.log(foodId);
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     const foodItem = await Food.findById(foodId); // Assuming you have a FoodItems model
     if (!foodItem) {
       throw new Error(`Food item not found for ID: ${foodId}`);
@@ -560,8 +660,13 @@ const getItemPriceById = async (foodId) => {
 const addOrder = async (req, res) => {
   try {
     const { orderId, foodItems } = req.body;
+<<<<<<< HEAD
     const customer = getUserData(req.headers);
     if (!customer)
+=======
+    const { customerId } = getUserData(req.headers);
+    if (!customerId)
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       return res
         .status(403)
         .json({ success: false, message: "User Expired Please log in again" });
@@ -571,13 +676,20 @@ const addOrder = async (req, res) => {
         .status(400)
         .json({ success: false, message: "provide food item  and orderid..." });
     }
+<<<<<<< HEAD
 
     const order = await Order.findById(orderId).populate("foodItems.foodId");
+=======
+    console.log(customerId, foodItems);
+    console.log("object");
+    const order = await Order.findById(orderId);
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!order) {
       return res
         .status(400)
         .json({ success: false, message: " Order is not found..." });
     }
+<<<<<<< HEAD
 
     foodItems.forEach((item) => {
       const existingFooditem = order.foodItems.find((foodItem) =>
@@ -655,6 +767,49 @@ const yesterdayOrder = async (req, res) => {
     return res.status(500).json({ success: true, message: error });
   }
 };
+=======
+    console.log("Order found:", order);
+    foodItems.forEach((item) => {
+      order.foodItems.push({
+        foodId: new mongoose.Types.ObjectId(item.Id),
+        quantity: item.quantity,
+      });
+    });
+    console.log("Updated Food Items:", order.foodItems);
+    const totalAmount = await Promise.all(
+      order.foodItems.map(async (item) => {
+        const itemPrice = await getItemPriceById(item.foodId);
+        console.log("Item Price for", item.foodId, ":", itemPrice);
+        return item.quantity * itemPrice;
+      })
+    ).then((results) => results.reduce((sum, price) => sum + price, 0));
+    // const totalAmount = order.foodItems.reduce((sum, item) => {
+    //   const itemPrice = getItemPriceById(item.foodId);
+    //   return sum + item.quantity * itemPrice;
+    // }, 0);
+    // const totalAmount = await Promise.all(
+    //   order.foodItems.map(async (item) => {
+    //     const itemPrice = await getItemPriceById(item.foodId);
+    //     return item.quantity * itemPrice;
+    //   })
+    // ).then((results) => results.reduce((sum, price) => sum + price, 0));
+    console.log("object2");
+    order.totalAmount = totalAmount;
+    console.log("Total Amount:", totalAmount);
+    await order.save();
+    console.log("object3");
+
+    return res
+      .status(200)
+      .json({ msg: "Order update successfully", order, success: true });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Error creating order", error });
+  }
+};
+
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 module.exports = {
   createOrder: createOrder,
   deleteOrder: deleteOrder,
@@ -668,8 +823,11 @@ module.exports = {
   addOrder: addOrder,
   updateOrderPayment: updateOrderPayment,
   adminOrderList: adminOrderList,
+<<<<<<< HEAD
   updateOrderBySocket,
   updateOrderPaymentBySocket,
   yesterdayOrder: yesterdayOrder,
   addOrder: addOrder,
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 };

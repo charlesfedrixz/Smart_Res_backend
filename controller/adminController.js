@@ -51,13 +51,18 @@ const bodyParser = require("body-parser");
 // }
 function getUserData(headers) {
   // Split the Bearer token
+<<<<<<< HEAD
   // console.log(headers?.authorization);
   const token = headers?.authorization?.split(" ")[1];
+=======
+  const token = headers.authorization.split(" ")[1];
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   if (!token)
     return {
       success: false,
       message: "Invalid token",
       userId: null,
+<<<<<<< HEAD
       token: null,
     };
 
@@ -99,6 +104,23 @@ function getUserData(headers) {
       userId: null,
     };
   }
+=======
+    };
+  const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+  console.log(verifiedToken);
+
+  if (!verifiedToken)
+    return {
+      success: false,
+      message: "Invalid token",
+      userId: null,
+    };
+  return {
+    success: true,
+    message: "Token verified successfully",
+    userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
+  };
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 }
 //create user
 const createUser = asyncHandler(async (req, res) => {
@@ -145,14 +167,21 @@ const createUser = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+<<<<<<< HEAD
     return res.status(500).json({ success: false, message: error });
+=======
+    return res.status(500).json({ success: false, message: "Server Error" });
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   }
 });
 
 //login
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+<<<<<<< HEAD
   console.log(email, password);
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   try {
     const existingUser = await User.findOne({ email });
     // Check if user exists
@@ -173,7 +202,10 @@ const login = asyncHandler(async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+<<<<<<< HEAD
     console.log(existingUser);
+=======
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     res.status(201).json({
       success: true,
       token,
@@ -182,7 +214,11 @@ const login = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.log(error);
+<<<<<<< HEAD
     return res.status(500).json({ success: false, message: error });
+=======
+    return res.status(500).json({ success: false, message: "Server Error" });
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 
     // throwError("Server", 500, false);
   }
@@ -317,19 +353,28 @@ const resetPassword = asyncHandler(async (req, res) => {
 //logout
 const logout = asyncHandler(async (req, res) => {
   try {
+<<<<<<< HEAD
     const { success, message, userId } = getUserData(req.headers);
     // console.log(userId);
     if (!success) {
       const statusCode = message === "Token has expired " ? 401 : 400;
       return res.status(statusCode).json({ success: false, message });
     }
+=======
+    const { userId } = getUserData(req.headers);
+    console.log(userId);
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!userId) {
       return res
         .status(400)
         .json({ success: false, message: "Please provide token... " });
     }
     const user = await User.findById(userId);
+<<<<<<< HEAD
     console.log("user:", user);
+=======
+    console.log(user);
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!user) {
       return res.status(403).json({
         success: false,
@@ -339,7 +384,11 @@ const logout = asyncHandler(async (req, res) => {
     // Assuming the token is part of the authorization header
     const token = req.headers.authorization.split(" ")[1];
 
+<<<<<<< HEAD
     // // Ensure the tokens array exists
+=======
+    // Ensure the tokens array exists
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!user.tokens) {
       user.tokens = [];
     }
@@ -351,7 +400,11 @@ const logout = asyncHandler(async (req, res) => {
       .json({ success: true, message: "Successfully logged out" });
   } catch (error) {
     console.error(error);
+<<<<<<< HEAD
     return res.status(500).json({ success: false, message: error });
+=======
+    return res.status(500).json({ success: false, message: "Server Error" });
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   }
 });
 

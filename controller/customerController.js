@@ -62,7 +62,11 @@ const resendOtp = asyncHandler(async (req, res) => {
     console.error("Error sending SMS:", error);
     return res.status(500).json({
       success: false,
+<<<<<<< HEAD
       message: error,
+=======
+      message: "Server error",
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     });
   }
 });
@@ -73,13 +77,21 @@ const deleteAccount = asyncHandler(async (req, res) => {
     const user = await customer.findOne({
       currentTableNumber,
     });
+<<<<<<< HEAD
     console.log("user", user);
+=======
+    console.log(user);
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!user) {
       return res
         .status(400)
         .json({ success: false, message: "User not found." });
     }
+<<<<<<< HEAD
     // await Order.deleteMany({ customerId: user._id });
+=======
+    await Order.deleteMany({ customerId: user._id });
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     await customer.deleteOne({ _id: user._id });
     return res.status(200).json({
       message: "Account and associated orders deleted successfully.",
@@ -89,11 +101,16 @@ const deleteAccount = asyncHandler(async (req, res) => {
     console.error(error.message);
     return res.status(500).json({
       success: false,
+<<<<<<< HEAD
       message: error,
+=======
+      message: "Server error",
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     });
   }
 });
 
+<<<<<<< HEAD
 // const mobileRegister = asyncHandler(async (req, res) => {
 //   try {
 //     const { mobileNumber, currentTableNumber } = req.body;
@@ -147,6 +164,52 @@ const deleteAccount = asyncHandler(async (req, res) => {
 //     return res.status(500).json({ success: false, message: error });
 //   }
 // });
+=======
+const mobileRegister = asyncHandler(async (req, res) => {
+  try {
+    const { mobileNumber, currentTableNumber } = req.body;
+    if (!mobileNumber || !currentTableNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "provide mobile number and table number",
+      });
+    }
+    const customerFind = await customer.findOne({ mobileNumber });
+    if (customerFind) {
+      const otp = generateOTP();
+      customerFind.currentTableNumber == currentTableNumber;
+      customerFind.otp == otp;
+      await customerFind.save();
+
+      //send otp function
+      await sendOTPSMS(mobileNumber, otp);
+      return res.status(200).json({
+        success: true,
+        token: null,
+        message: "OTP is send and register with success for existing user ",
+      });
+    }
+    const otp = generateOTP();
+    const newCustomer = await customer.create({
+      mobileNumber: mobileNumber,
+      currentTableNumber: currentTableNumber,
+      otp: otp,
+      otpExpire: Date.now() + 1000 * 60 * 5,
+    });
+    //send otp function
+    await sendOTPSMS(mobileNumber, otp);
+    return res.status(200).json({
+      success: true,
+      Data: newCustomer,
+      token: null,
+      message: "Register a new customer and OTP is send with success",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 const OtpVerify = async (req, res) => {
   try {
     const { mobileNumber, otp } = req.body;
@@ -159,6 +222,7 @@ const OtpVerify = async (req, res) => {
     if (!findCustomer) {
       return res.status(200).json({ success: false, message: "No Data found" });
     }
+<<<<<<< HEAD
     // if (findCustomer.otp !== otp || findCustomer.otpExpire < Date.now()) {
     //   return res.status(400).json({ success: false, message: "Invalid OTP." });
     // }
@@ -169,6 +233,13 @@ const OtpVerify = async (req, res) => {
       return res.status(400).json({ success: false, message: "Expired OTP." });
     }
     console.log(findCustomer.otp, otp);
+=======
+    if (!findCustomer.otp == otp && findCustomer.otpExpire < Date.now()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or Expired OTP." });
+    }
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     findCustomer.isVerified = true;
     findCustomer.otp = undefined;
     findCustomer.otpExpire = undefined;
@@ -187,6 +258,7 @@ const OtpVerify = async (req, res) => {
     //   mobileNumber,
     //   `Smart Restaurant verified your ${mobileNumber} successfully.`
     // );
+<<<<<<< HEAD
     return res.status(200).json({
       success: true,
       token,
@@ -260,4 +332,19 @@ module.exports = {
   // mobileRegister: mobileRegister,
   OtpVerify: OtpVerify,
   Register: Register,
+=======
+    return res
+      .status(200)
+      .json({ success: true, token, message: "OTP verified with success" });
+  } catch (error) {
+    console.error(error);
+    return res.status(400).json({ success: false, message: "Server Error" });
+  }
+};
+module.exports = {
+  resendOtp: resendOtp,
+  deleteAccount: deleteAccount,
+  mobileRegister: mobileRegister,
+  OtpVerify: OtpVerify,
+>>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 };
