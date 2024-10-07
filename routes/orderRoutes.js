@@ -11,10 +11,7 @@ const {
   addOrder,
   updateOrderPayment,
   adminOrderList,
-<<<<<<< HEAD
   yesterdayOrder,
-=======
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 } = require("../controller/orderController"); // Ensure correct path
 
 const order = express.Router();
@@ -29,14 +26,8 @@ order.get("/customerlist", customerOrderlist);
 order.put("/addOrder", addOrder);
 order.put("/updatePayment", updateOrderPayment);
 order.get("/adminOrderList", adminOrderList);
-<<<<<<< HEAD
 order.get("/yesterdayOrderList", yesterdayOrder);
 order.post("/addOrder", addOrder);
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 
 module.exports = {
   order: order,

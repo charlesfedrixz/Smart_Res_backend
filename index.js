@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 //create a server
 const http = require("http");
 const { Server } = require("socket.io");
@@ -9,13 +5,6 @@ const { Server } = require("socket.io");
 const express = require("express");
 const app = express();
 // socket
-<<<<<<< HEAD
-=======
-=======
-const express = require("express");
-const app = express();
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
@@ -29,7 +18,6 @@ const orderRoutes = require("./routes/orderRoutes");
 const payments = require("./routes/paymentRoute");
 const errorHandle = require("./controller/errorHandle");
 const { categoryRoutes } = require("./routes/categoryRoute");
-<<<<<<< HEAD
 const {
   updateOrderBySocket,
   updateOrderPaymentBySocket,
@@ -43,30 +31,10 @@ app.use(
     credentials: true,
   })
 );
-=======
-
-app.use(express.json());
-app.use(cors());
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 app.use(express.static("uploads"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
 app.use(errorHandle);
-<<<<<<< HEAD
-=======
-// app.use(
-//   cors({
-<<<<<<< HEAD
-//     origin: "*",
-=======
-//     origin: "https://xzdzwm7n-5173.inc1.devtunnels.ms/",
-//     methods: ["GET", "POST"],
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
-//     allowedHeaders: ["my-custom-header"],
-//     credentials: true,
-//   })
-// );
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 connectDB();
 
 app.use("/api/admin", adminRoutes);
@@ -75,10 +43,6 @@ app.use("/api/food", foodRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes.order);
 app.use("/api/pay", payments);
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 app.use("/api/invoice", invoiceRoute);
 
 const server = http.createServer(app);
@@ -153,54 +117,13 @@ io.on("connection", (socket) => {
 
 app.get("/", (req, res) => {
   res.status(200).json({
-<<<<<<< HEAD
-=======
-=======
-
-//create a server
-// const http = require("http");
-// const server = http.createServer(app);
-// const { Server } = require("socket.io");
-
-// const io = new Server(server, {
-//   cors: {
-//     origin: "https://xzdzwm7n-5173.inc1.devtunnels.ms/", //client side server
-//     methods: ["GET", "POST"],
-//     allowedHeaders: ["my-custom-header"],
-//     credentials: true,
-//   },
-// });
-// //Handle socket connections
-// io.on("connection", (socket) => {
-//   socket.emit("hello", "world");
-//   console.log("what is connection", socket);
-//   console.log("customer connected");
-
-//   socket.on("chat", (playload) => {
-//     console.log("what is playload", playload);
-//     io.emit("chat", playload);
-//   });
-//   // Handle client disconnection
-//   socket.on("disconnect", () => {
-//     console.log("customer disconnected");
-//   });
-// });
-
-app.get("/", (req, res) => {
-  return res.status(200).json({
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
     success: true,
     message: "Server of your Smart Restaurant is running...",
   });
 });
 
 const port = 1000;
-<<<<<<< HEAD
 server.listen(port, () => {
-=======
-app.listen(port, () => {
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   console.log(
     `Server of your Smart Restaurant is running on http://localhost:${port}`
   );

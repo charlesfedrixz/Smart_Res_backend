@@ -4,49 +4,35 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-<<<<<<< HEAD
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon index"
-=======
-    "start": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-<<<<<<< HEAD
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
-=======
-<<<<<<< HEAD
     "axios": "^1.7.7",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
-=======
     "axios": "^1.7.2",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
     "buffer": "^6.0.3",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "digest": "^0.0.5",
     "dotenv": "^16.4.5",
-<<<<<<< HEAD
     "express": "^4.21.0",
     "express-async-handler": "^1.2.0",
     "express-validator": "^7.2.0",
     "googleapis": "^144.0.0",
-=======
-<<<<<<< HEAD
     "express": "^4.21.0",
     "express-async-handler": "^1.2.0",
     "express-validator": "^7.2.0",
@@ -67,13 +53,11 @@
     "stream": "^0.0.3",
     "twilio": "^5.3.3",
     "uniqid": "^5.4.0",
-    "validator": "^13.12.0"
-=======
+    "validator": "^13.12.0",
     "express": "^4.19.2",
     "express-async-handler": "^1.2.0",
     "express-validator": "^7.1.0",
     "firebaseui": "^6.1.0",
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
     "hmac": "^1.0.1",
     "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.2",
@@ -88,17 +72,15 @@
     "sha256": "^0.2.0",
     "socket.io": "^4.8.0",
     "split": "^1.0.1",
-<<<<<<< HEAD
+
     "stream": "^0.0.3",
     "twilio": "^5.3.3",
     "uniqid": "^5.4.0",
-    "validator": "^13.12.0"
-=======
+    "validator": "^13.12.0",
+
     "stripe": "^15.8.0",
     "twilio": "^5.2.2",
     "uniqid": "^5.4.0",
     "validator": "^13.11.0"
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
   }
 }

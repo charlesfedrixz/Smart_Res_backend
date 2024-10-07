@@ -1,7 +1,6 @@
 const Food = require("../models/foodModels");
 const fs = require("fs");
 const jwt = require("jsonwebtoken");
-<<<<<<< HEAD
 const { google } = require("googleapis");
 const path = require("path");
 const stream = require("stream");
@@ -9,11 +8,6 @@ require("dotenv").config();
 const { validationResult } = require("express-validator");
 const Category = require("../models/categoryModels");
 const asyncHandler = require("express-async-handler");
-=======
-require("dotenv").config();
-const { validationResult } = require("express-validator");
-const Category = require("../models/categoryModels");
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
 
 function getUserData(headers) {
   // Split the Bearer token
@@ -39,7 +33,6 @@ function getUserData(headers) {
   };
 }
 
-<<<<<<< HEAD
 const KEYFILEPATH = path.join(__dirname, "..", "cred.json");
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
 const auth = new google.auth.GoogleAuth({
@@ -68,31 +61,16 @@ const uploadFood = asyncHandler(async (req, res) => {
     const { userId } = getUserData(req.headers);
     const { name, description, category, price } = req.body;
     const image = req.file; // File path after upload
-=======
-const uploadFood = async (req, res) => {
-  try {
-    const { userId } = getUserData(req.headers);
-    const { name, description, category, price } = req.body;
-    console.log("userId:", userId);
-
-    let imagePath = req.file.filename; // File path after upload
-    console.log("field:", name, description, category, price, imagePath);
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     if (!userId) {
       return res
         .status(400)
         .json({ success: false, message: "User Expired Please log in again" });
     }
-<<<<<<< HEAD
     if (!name || !description || !category || !price || !image) {
-=======
-    if (!name || !description || !category || !price || !imagePath) {
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
       return res
         .status(400)
         .json({ success: false, message: "Please provide all the field..." });
     }
-<<<<<<< HEAD
     const uploadDrive = await insertFile(image);
     if (!uploadDrive) {
       return res
@@ -107,78 +85,15 @@ const uploadFood = async (req, res) => {
       image: uploadDrive.id,
       userId,
     });
-=======
-
-    // Save food details to MongoDB
-    const newFood = await Food.create({
-      name: name,
-      description: description,
-      category: category,
-      price: price,
-      image: imagePath,
-      userId: userId,
-    });
-    // .populate("categoryId");
-    console.log(newFood);
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     return res.status(200).json({
       success: true,
       newFood,
       message: "Food uploaded successfully",
     });
   } catch (error) {
-<<<<<<< HEAD
     return res.status(500).json({ success: false, message: error });
   }
 });
-<<<<<<< HEAD
-=======
-
-// const uploadFood = async (req, res) => {
-//   try {
-//     const { userId } = getUserData(req.headers);
-//     const { name, description, category, price } = req.body;
-//     // console.log("userId:", userId);
-
-//     let imagePath = req.file.filename; // File path after upload
-//     // console.log("field:", name, description, category, price, imagePath);
-//     if (!userId) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "User Expired Please log in again" });
-//     }
-//     if (!name || !description || !category || !price || !imagePath) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Please provide all the field..." });
-//     }
-
-//     // Save food details to MongoDB
-//     const newFood = await Food.create({
-//       name: name,
-//       description: description,
-//       category: category,
-//       price: price,
-//       image: imagePath,
-//       userId: userId,
-//     });
-//     // .populate("categoryId");
-//     console.log(newFood);//
-//     return res.status(200).json({
-//       success: true,
-//       newFood,
-//       message: "Food uploaded successfully",
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, message: "Server Error" });
-//   }
-// };
-=======
-    return res.status(500).json({ success: false, message: "Server Error" });
-  }
-};
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
 //list food
 const listFood = async (req, res) => {
   try {
@@ -201,11 +116,7 @@ const listFood = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-<<<<<<< HEAD
     return res.status(500).json({ success: false, message: error });
-=======
-    return res.status(500).json({ success: false, message: "Server Error" });
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
   }
 };
 //remove food
@@ -229,13 +140,9 @@ const removedFood = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Food is not found..." });
     }
-<<<<<<< HEAD
     // fs.unlink(`uploads/${food.image}`, () => {});
     const driveUpload = google.drive({ version: "v3", auth });
     await driveUpload.files.delete({ fileId: food.image });
-=======
-    fs.unlink(`uploads/${food.image}`, () => {});
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     await Food.findByIdAndDelete(id);
     return res
       .status(200)

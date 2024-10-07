@@ -53,56 +53,6 @@ const createCategory = asynchandler(async (req, res) => {
 
 const getCategory = asynchandler(async (req, res) => {
   try {
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-    // const authHeader = req?.headers?.authorization;
-    // if (!authHeader) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Please provide token." });
-    // }
-    // const token = authHeader.split(" ")[1];
-    // if (!token) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Please provide token... " });
-    // }
-    // const verify = jwt.verify(token, process.env.JWT_SECRET);
-    // if (!verify) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Invalid token please login again...",
-    //   });
-    // }
-=======
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token." });
-    }
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token... " });
-    }
-    const verify = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verify) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid token please login again...",
-      });
-    }
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
-    // const { category } = req.query;
-    // if (!category) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Please provide category..." });
-    // }
->>>>>>> a66210d9847ab045370c8d6b6cfd4ef9f93d57a3
     const list = await Category.find({});
     if (!list) {
       return res
@@ -115,10 +65,7 @@ const getCategory = asynchandler(async (req, res) => {
       message: "Listed a category with success...",
     });
   } catch (error) {
-<<<<<<< HEAD
     console.log(error);
-=======
->>>>>>> 18d00605b33224bc145136653b11b4c19b569080
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 });
