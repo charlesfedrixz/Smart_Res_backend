@@ -287,11 +287,11 @@ const customerOrderlist = async (req, res) => {
     }
     const ordersWithFoodDetails = orders.map((order) => {
       const allFooditems = order.foodItems.map((item) => ({
-        food: item.foodId,
+        food: item.foodId ? item.foodId : "Food not found",
         quantity: item.quantity,
       }));
       const newFooditems = order.foodItems
-        .filter((item) => item.isNewItem)
+        .filter((item) => item.isNewItem && item.foodId)
         .map((item) => ({
           food: item.foodId,
           quantity: item.quantity,
@@ -306,8 +306,8 @@ const customerOrderlist = async (req, res) => {
         orderTotal: order.totalAmount,
         orderPaymentMode: order.payment_mode,
         orderPayment: order.payment,
-        allFooditems,
-        newFooditems,
+        allFooditems: allFooditems,
+        newFooditems: newFooditems,
 
         foodItems: order.foodItems.map((item) => ({
           food: item.foodId, // This now includes the full food document
@@ -315,6 +315,8 @@ const customerOrderlist = async (req, res) => {
         })),
       };
     });
+
+    console.log("details:", ordersWithFoodDetails);
     // Respond with the order and food details
     return res.status(200).json({
       success: true,
@@ -517,6 +519,8 @@ const getItemPriceById = async (foodId) => {
 const addOrder = async (req, res) => {
   try {
     const { orderId, foodItems } = req.body;
+    console.log("orderId:", orderId);
+    console.log("foodItem:", foodItems);
     const customer = getUserData(req.headers);
     if (!customer)
       return res
@@ -537,8 +541,8 @@ const addOrder = async (req, res) => {
     }
 
     foodItems.forEach((item) => {
-      const existingFooditem = order.foodItems.find((foodItem) =>
-        foodItem.foodId && foodItem.foodId.equals(item.id)
+      const existingFooditem = order.foodItems.find(
+        (foodItem) => foodItem.foodId && foodItem.foodId.equals(item.id)
       );
       if (existingFooditem) {
         existingFooditem.quantity += item.quantity;
@@ -553,28 +557,29 @@ const addOrder = async (req, res) => {
     const newItemsAmount = await Promise.all(
       foodItems.map(async (item) => {
         try {
-          const itemPrice = await getItemPriceById(item.foodId);
+          const itemPrice = await getItemPriceById(item.id);
           if (!itemPrice) {
             throw new Error(`Food item price not found for ID: ${item.foodId}`);
           }
-          console.log("Item Price for", item.foodId, ":", itemPrice);
+          console.log("Item Price for", item.id, ":", itemPrice);
           return item.quantity * itemPrice;
         } catch (error) {
-          console.error(
-            `Error fetching price for item ID: ${item.foodId}`,
-            error
-          );
+          console.error(`Error fetching price for item ID: ${item.id}`, error);
           throw error;
         }
       })
-    ).then((results) => results.reduce((sum, price) => sum + price, 0));
-    let newItemsTotalAmount = 0;
-    order.newItemsTotalAmount += newItemsAmount;
+    );
+    const newItemsTotalAmount = newItemsAmount.reduce(
+      (sum, price) => sum + price,
+      0
+    );
+    order.newItemsTotalAmount =
+      (order.newItemsTotalAmount || 0) + newItemsTotalAmount;
     await order.save();
 
     return res
       .status(200)
-      .json({ msg: "AddOrder update successfully", order, success: true });
+      .json({ message: "AddOrder update successfully", order, success: true });
   } catch (error) {
     console.error("Error adding new order:", error);
     return res
@@ -610,6 +615,52 @@ const yesterdayOrder = async (req, res) => {
     return res.status(500).json({ success: true, message: error });
   }
 };
+
+const customerlistOrder = async (req, res) => {
+  try {
+    const { customerId } = getUserData(req.headers);
+    if (!customerId)
+      return res
+        .status(403)
+        .json({ success: false, message: "User Expired Please log in again" });
+
+    // Retrieve orders for the customer and populate food details
+    const orders = await Order.find({ customerId })
+      .populate("foodItems.foodId")
+      .exec();
+    if (!orders.length) {
+      return res
+        .status(200)
+        .json({ success: true, message: "No orders found." });
+    }
+    const ordersWithFoodDetails = orders.map((order) => {
+      const allFooditems = order.foodItems.map((item) => ({
+        food: item.foodId ? item.foodId : "Food not found",
+        quantity: item.quantity,
+      }));
+      return {
+        _id: order._id,
+        customerId: order.customerId,
+        orderDate: order.orderDate,
+        orderStatus: order.status,
+        orderTotal: order.totalAmount,
+        orderPaymentMode: order.payment_mode,
+        orderPayment: order.payment,
+        allFooditems,
+      };
+    });
+    return res.status(200).json({
+      success: true,
+      orders: ordersWithFoodDetails,
+      message: "Customer order listed successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return res
+      .status(500)
+      .json({ msg: "Error fetching orders", error: error.message });
+  }
+};
 module.exports = {
   createOrder: createOrder,
   deleteOrder: deleteOrder,
@@ -627,4 +678,5 @@ module.exports = {
   updateOrderPaymentBySocket,
   yesterdayOrder: yesterdayOrder,
   addOrder: addOrder,
+  customerlistOrder: customerlistOrder,
 };

@@ -2,7 +2,7 @@ require("dotenv").config();
 const Razorpay = require("razorpay");
 const Order = require("../models/orderModels");
 const crypto = require("crypto");
-const Invoice = require("../models/invoicemodel");
+const { Invoice } = require("../models/invoicemodel");
 
 const payment = async (req, res) => {
   try {
