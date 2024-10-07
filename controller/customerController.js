@@ -79,7 +79,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: "User not found." });
     }
-    // await Order.deleteMany({ customerId: user._id });  
+    // await Order.deleteMany({ customerId: user._id });
     await customer.deleteOne({ _id: user._id });
     return res.status(200).json({
       message: "Account and associated orders deleted successfully.",
@@ -94,59 +94,59 @@ const deleteAccount = asyncHandler(async (req, res) => {
   }
 });
 
-const mobileRegister = asyncHandler(async (req, res) => {
-  try {
-    const { mobileNumber, currentTableNumber } = req.body;
-    if (!mobileNumber || !currentTableNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide a Mobile Number",
-      });
-    }
-    const tableNumber = await customer.findOne({ currentTableNumber });
-    if (tableNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Table's occupied by another customer",
-      });
-    }
-    const customerFind = await customer.findOne({ mobileNumber });
-    if (customerFind) {
-      const otp = generateOTP();
-      customerFind.currentTableNumber = currentTableNumber;
-      customerFind.otp = otp;
-      await customerFind.save();
+// const mobileRegister = asyncHandler(async (req, res) => {
+//   try {
+//     const { mobileNumber, currentTableNumber } = req.body;
+//     if (!mobileNumber || !currentTableNumber) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide a Mobile Number",
+//       });
+//     }
+//     const tableNumber = await customer.findOne({ currentTableNumber });
+//     if (tableNumber) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Table's occupied by another customer",
+//       });
+//     }
+//     const customerFind = await customer.findOne({ mobileNumber });
+//     if (customerFind) {
+//       const otp = generateOTP();
+//       customerFind.currentTableNumber = currentTableNumber;
+//       customerFind.otp = otp;
+//       await customerFind.save();
 
-      //send otp function
-      await sendOTPSMS(mobileNumber, otp);
-      return res.status(200).json({
-        success: true,
-        token: null,
-        message:
-          "OTP pppp is send and register with success for existing user ",
-      });
-    }
+//       //send otp function
+//       await sendOTPSMS(mobileNumber, otp);
+//       return res.status(200).json({
+//         success: true,
+//         token: null,
+//         message:
+//           "OTP pppp is send and register with success for existing user ",
+//       });
+//     }
 
-    const otp = generateOTP();
-    const newCustomer = await customer.create({
-      mobileNumber: mobileNumber,
-      currentTableNumber: currentTableNumber,
-      otp: otp,
-      otpExpire: Date.now() + 1000 * 60 * 5,
-    });
-    //send otp function
-    await sendOTPSMS(mobileNumber, otp);
-    return res.status(200).json({
-      success: true,
-      Data: newCustomer,
-      token: null,
-      message: "Register a new customer and OTP is send with success",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error });
-  }
-});
+//     const otp = generateOTP();
+//     const newCustomer = await customer.create({
+//       mobileNumber: mobileNumber,
+//       currentTableNumber: currentTableNumber,
+//       otp: otp,
+//       otpExpire: Date.now() + 1000 * 60 * 5,
+//     });
+//     //send otp function
+//     await sendOTPSMS(mobileNumber, otp);
+//     return res.status(200).json({
+//       success: true,
+//       Data: newCustomer,
+//       token: null,
+//       message: "Register a new customer and OTP is send with success",
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ success: false, message: error });
+//   }
+// });
 const OtpVerify = async (req, res) => {
   try {
     const { mobileNumber, otp } = req.body;
@@ -200,9 +200,64 @@ const OtpVerify = async (req, res) => {
     return res.status(400).json({ success: false, message: error });
   }
 };
+
+const Register = asyncHandler(async (req, res) => {
+  try {
+    const { mobileNumber, currentTableNumber } = req.body;
+    if (!mobileNumber || !currentTableNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a Mobile Number",
+      });
+    }
+    const customerFind = await customer.findOne({ mobileNumber });
+    if (customerFind && customerFind.currentTableNumber != currentTableNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Table's occupied by another customer try a new table",
+      });
+    } else if (
+      customerFind &&
+      customerFind.currentTableNumber == currentTableNumber
+    ) {
+      const otp = generateOTP();
+      customerFind.currentTableNumber = currentTableNumber;
+      customerFind.otp = otp;
+      await customerFind.save();
+      //send otp function
+      await sendOTPSMS(mobileNumber, otp);
+      return res.status(200).json({
+        success: true,
+        token: null,
+        message:
+          "OTP pppp is send and register with success for existing user ",
+      });
+    }
+
+    const otp = generateOTP();
+    const newCustomer = await customer.create({
+      mobileNumber: mobileNumber,
+      currentTableNumber: currentTableNumber,
+      otp: otp,
+      otpExpire: Date.now() + 1000 * 60 * 5,
+    });
+    //send otp function
+    await sendOTPSMS(mobileNumber, otp);
+    return res.status(200).json({
+      success: true,
+      Data: newCustomer,
+      token: null,
+      message: "Register a new customer and OTP is send with success",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error });
+  }
+});
 module.exports = {
   resendOtp: resendOtp,
   deleteAccount: deleteAccount,
-  mobileRegister: mobileRegister,
+  // mobileRegister: mobileRegister,
   OtpVerify: OtpVerify,
+  Register: Register,
 };

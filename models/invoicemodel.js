@@ -42,6 +42,7 @@ InvoiceSchema.methods.updateStatus = async function (status) {
   console.log(this);
 };
 
-const Invoice = mongoose.model("Invoice", InvoiceSchema);
+const Invoice =
+  mongoose.models.Invoice || mongoose.model("Invoice", InvoiceSchema);
 
-module.exports = { Invoice };
+module.exports = Invoice;
