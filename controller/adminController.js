@@ -5,53 +5,8 @@ const validator = require("validator");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const asyncHandler = require("express-async-handler");
-const bodyParser = require("body-parser");
 
-// function getUserData(headers) {
-//   console.log("object");
-//   if (!headers.authorization) {
-//     return {
-//       success: false,
-//       message: "Token header missing",
-//       userId: null,
-//     };
-//   }
-//   // Split the Bearer token
-//   const token = headers.authorization.split(" ")[1];
-//   // const tokenParts = headers.authorization.split(" ");
-//   // if (tokenParts.length !== 2 || tokenParts[0] !== "Bearer") {
-//   //   return {
-//   //     success: false,
-//   //     message: "Invalid token format",
-//   //     userId: null,
-//   //   };
-//   // }
-
-//   // const token = tokenParts[1];
-//   console.log(token);
-//   if (!token) {
-//     return res
-//       .status(400)
-//       .json({ success: false, message: "Token header missing", userId: null });
-//   }
-//   const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-//   console.log(verifiedToken);
-
-//   if (!verifiedToken)
-//     return {
-//       success: false,
-//       message: "Invalid token",
-//       userId: null,
-//     };
-//   return {
-//     success: true,
-//     message: "Token verified successfully",
-//     userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
-//   };
-// }
 function getUserData(headers) {
-  // Split the Bearer token
-  // console.log(headers?.authorization);
   const token = headers?.authorization?.split(" ")[1];
   if (!token)
     return {
@@ -79,7 +34,6 @@ function getUserData(headers) {
       };
     }
     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-    // console.log(verifiedToken);
 
     if (!verifiedToken)
       return {
@@ -140,6 +94,7 @@ const createUser = asyncHandler(async (req, res) => {
     //Create a new user
     const newUser = await User.create({ email, password: hashedPassword });
     return res.status(200).json({
+      newUser,
       success: true,
       message: "Admin signed up successfully.",
     });

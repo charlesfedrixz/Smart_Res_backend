@@ -7,8 +7,6 @@ const {
   logout,
   verifiedEmailOTP,
 } = require("../controller/adminController");
-// const { auth } = require("../middleware/checkAuth");
-// const { sendResetEmailPassword } = require("../mailer");
 
 const adminRoutes = express.Router();
 adminRoutes.post("/signup", createUser);

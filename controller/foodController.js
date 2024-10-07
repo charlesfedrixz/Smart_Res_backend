@@ -94,46 +94,6 @@ const uploadFood = asyncHandler(async (req, res) => {
     return res.status(500).json({ success: false, message: error });
   }
 });
-
-// const uploadFood = async (req, res) => {
-//   try {
-//     const { userId } = getUserData(req.headers);
-//     const { name, description, category, price } = req.body;
-//     // console.log("userId:", userId);
-
-//     let imagePath = req.file.filename; // File path after upload
-//     // console.log("field:", name, description, category, price, imagePath);
-//     if (!userId) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "User Expired Please log in again" });
-//     }
-//     if (!name || !description || !category || !price || !imagePath) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Please provide all the field..." });
-//     }
-
-//     // Save food details to MongoDB
-//     const newFood = await Food.create({
-//       name: name,
-//       description: description,
-//       category: category,
-//       price: price,
-//       image: imagePath,
-//       userId: userId,
-//     });
-//     // .populate("categoryId");
-//     console.log(newFood);//
-//     return res.status(200).json({
-//       success: true,
-//       newFood,
-//       message: "Food uploaded successfully",
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, message: "Server Error" });
-//   }
-// };
 //list food
 const listFood = async (req, res) => {
   try {

@@ -14,32 +14,17 @@ const orderSchema = new mongoose.Schema(
       {
         foodId: { type: mongoose.Types.ObjectId, ref: "Food", required: true },
         quantity: { type: Number, min: 1, required: true },
-        // status: {
-        //   type: String,
-        //   required: true,
-        //   enum: [
-        //     "Preparing...",
-        //     "Ready...",
-        //     "Processing...",
-        //     "Completed",
-        //     "Your order is being prepared ...",
-        //     "Your order is ready...",
-        //     "Food Processing...",
-        //     "Completed",
-        //   ],
-        //   default: "Preparing...",
-        // },
+        isNewItem: { type: Boolean, default: false },
       },
     ],
     totalAmount: { type: Number, required: true },
+    newItemsTotalAmount: { type: Number, default: 0 },
     status: {
       type: String,
       required: true,
       enum: ["Preparing", "Ready", "Processing", "Completed"],
       default: "Processing",
     },
-
-    // createdAt: { type: Date, default: Date.now },
     isRated: { type: Boolean, default: false },
     payment_mode: {
       type: String,

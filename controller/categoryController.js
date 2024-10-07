@@ -39,49 +39,20 @@ const createCategory = asynchandler(async (req, res) => {
           .json({ success: false, message: "Category is already created..." });
       }
     }
-    // const userId = token.id;
-    // const userEmail = token.email;
-    console.log("object");
     const newCategory = await Category.create({ category });
     console.log(newCategory);
     return res.status(201).json({
       success: true,
       message: "Category created success",
       data: newCategory,
-      // user: { id: userId, email: userEmail },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 });
-//get category
+
 const getCategory = asynchandler(async (req, res) => {
   try {
-    // const authHeader = req?.headers?.authorization;
-    // if (!authHeader) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Please provide token." });
-    // }
-    // const token = authHeader.split(" ")[1];
-    // if (!token) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Please provide token... " });
-    // }
-    // const verify = jwt.verify(token, process.env.JWT_SECRET);
-    // if (!verify) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Invalid token please login again...",
-    //   });
-    // }
-    // const { category } = req.query;
-    // if (!category) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Please provide category..." });
-    // }
     const list = await Category.find({});
     if (!list) {
       return res

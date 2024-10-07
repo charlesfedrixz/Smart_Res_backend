@@ -27,6 +27,7 @@ order.put("/addOrder", addOrder);
 order.put("/updatePayment", updateOrderPayment);
 order.get("/adminOrderList", adminOrderList);
 order.get("/yesterdayOrderList", yesterdayOrder);
+order.post("/addOrder", addOrder);
 
 module.exports = {
   order: order,

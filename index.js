@@ -1,4 +1,3 @@
-// @ts-check
 //create a server
 const http = require("http");
 const { Server } = require("socket.io");
@@ -6,7 +5,6 @@ const { Server } = require("socket.io");
 const express = require("express");
 const app = express();
 // socket
-const server = http.createServer(app);
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
@@ -24,6 +22,7 @@ const {
   updateOrderBySocket,
   updateOrderPaymentBySocket,
 } = require("./controller/orderController");
+const invoiceRoute = require("./routes/invoiceRoute");
 
 app.use(express.json());
 app.use(
@@ -33,17 +32,9 @@ app.use(
   })
 );
 app.use(express.static("uploads"));
-// app.use(express.static("public"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
 app.use(errorHandle);
-app.use(
-  cors({
-    origin: "*",
-    allowedHeaders: ["my-custom-header"],
-    credentials: true,
-  })
-);
 connectDB();
 
 app.use("/api/admin", adminRoutes);
@@ -52,7 +43,9 @@ app.use("/api/food", foodRoutes);
 app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes.order);
 app.use("/api/pay", payments);
+app.use("/api/invoice", invoiceRoute);
 
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*", //Admin side server
@@ -123,7 +116,7 @@ io.on("connection", (socket) => {
 });
 
 app.get("/", (req, res) => {
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
     message: "Server of your Smart Restaurant is running...",
   });
