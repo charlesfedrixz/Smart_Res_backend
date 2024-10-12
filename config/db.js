@@ -2,10 +2,7 @@ const mongoose = require("mongoose");
 
 const connectDB = async () => {
   await mongoose
-    .connect(
-      // "mongodb+srv://chand_10:1Qaz_wsx@cluster0.7xsryzu.mongodb.net/table"
-      "mongodb+srv://chand_10:1Qaz_wsx@cluster0.7xsryzu.mongodb.net/Restaurant"
-    )
+    .connect(process.env.MONGODB_URL)
     .then((result) => {
       console.log("Connected to MongoDB");
       // Start your server or perform other operations
