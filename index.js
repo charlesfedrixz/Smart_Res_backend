@@ -1,6 +1,7 @@
 //create a server
 const http = require("http");
 const { Server } = require("socket.io");
+const punycode = require("punycode/");
 
 const express = require("express");
 const app = express();
@@ -8,7 +9,6 @@ const app = express();
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
-const bodyParser = require("body-parser");
 require("dotenv").config();
 
 const { adminRoutes } = require("./routes/adminRoute");
