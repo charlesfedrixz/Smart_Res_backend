@@ -122,9 +122,18 @@ app.get("/", (req, res) => {
   });
 });
 
-const port = process.env.PORT || 3002;
-server.listen(port, () => {
+app.set("port", process.env.PORT || 3002);
+server.listen(app.get("port"), () => {
   console.log(
-    `Server of your Smart Restaurant is running on http://localhost:${port}`
+    `Server of your Smart Restaurant is running on http://localhost:${app.get(
+      "port"
+    )}`
   );
 });
+
+// const port = process.env.PORT || 3002;
+// server.listen(port, () => {
+//   console.log(
+//     `Server of your Smart Restaurant is running on http://localhost:${port}`
+//   );
+// });
