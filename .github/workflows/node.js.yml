@@ -16,7 +16,6 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +32,12 @@ jobs:
       - name: Touch .env and set environment variable
         run: |
           echo "${{ secrets.PROD_ENV_FILE }}" > .env
+          
+      - name: Create cred.json file from secret
+        run: |
+          echo "${{ secrets.PROD_CRED_FILE }}" > cred.json
 
       - name: Restart PM2 Service
         run: pm2 restart Restaurant-Backend
+
 
