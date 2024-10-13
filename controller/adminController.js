@@ -5,55 +5,56 @@ const validator = require("validator");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const asyncHandler = require("express-async-handler");
+const getUserData = require("../middleware/authUser");
 
-function getUserData(headers) {
-  const token = headers?.authorization?.split(" ")[1];
-  if (!token)
-    return {
-      success: false,
-      message: "Invalid token",
-      userId: null,
-      token: null,
-    };
+// function getUserData(headers) {
+//   const token = headers?.authorization?.split(" ")[1];
+//   if (!token)
+//     return {
+//       success: false,
+//       message: "Invalid token",
+//       userId: null,
+//       token: null,
+//     };
 
-  try {
-    const decodedToken = jwt.decode(token, { complete: true });
-    if (!decodedToken) {
-      return {
-        success: false,
-        message: "Invalid Token",
-        userId: null,
-      };
-    }
-    const currentTime = Math.floor(Date.now() / 1000);
-    if (decodedToken.payload.exp && currentTime > decodedToken.payload.exp) {
-      return {
-        success: false,
-        message: "Token has expired",
-        userId: null,
-      };
-    }
-    const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+//   try {
+//     const decodedToken = jwt.decode(token, { complete: true });
+//     if (!decodedToken) {
+//       return {
+//         success: false,
+//         message: "Invalid Token",
+//         userId: null,
+//       };
+//     }
+//     const currentTime = Math.floor(Date.now() / 1000);
+//     if (decodedToken.payload.exp && currentTime > decodedToken.payload.exp) {
+//       return {
+//         success: false,
+//         message: "Token has expired",
+//         userId: null,
+//       };
+//     }
+//     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!verifiedToken)
-      return {
-        success: false,
-        message: "Invalid token",
-        userId: null,
-      };
-    return {
-      success: true,
-      message: "Token verified successfully",
-      userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: "Invalid Token",
-      userId: null,
-    };
-  }
-}
+//     if (!verifiedToken)
+//       return {
+//         success: false,
+//         message: "Invalid token",
+//         userId: null,
+//       };
+//     return {
+//       success: true,
+//       message: "Token verified successfully",
+//       userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
+//     };
+//   } catch (error) {
+//     return {
+//       success: false,
+//       message: "Invalid Token",
+//       userId: null,
+//     };
+//   }
+// }
 //create user
 const createUser = asyncHandler(async (req, res) => {
   try {
@@ -273,7 +274,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 const logout = asyncHandler(async (req, res) => {
   try {
     const { success, message, userId } = getUserData(req.headers);
-    // console.log(userId);
+    console.log(userId);
     if (!success) {
       const statusCode = message === "Token has expired " ? 401 : 400;
       return res.status(statusCode).json({ success: false, message });

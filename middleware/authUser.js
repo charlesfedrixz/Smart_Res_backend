@@ -1,47 +1,96 @@
 const jwt = require("jsonwebtoken");
 
-const authMiddleware = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({
-      success: false,
-      message: "Unauthorized: Token not provided",
-    });
-  }
-
-  const token = authHeader.split(" ")[1];
+const getUserData = (headers) => {
+  const token = headers?.authorization?.split(" ")[1];
   if (!token) {
-    return res.status(401).json({
+    return {
       success: false,
-      message: "Unauthorized: Token format invalid",
-    });
+      message: "Invalid token",
+      userId: null,
+      token: null,
+    };
   }
-
   try {
-    const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verifiedToken)
+    const decodedToken = jwt.decode(token, { complete: true });
+    if (!decodedToken) {
       return {
+        success: false,
+        message: "Invalid Token",
         userId: null,
       };
-    req.body.userId = verifiedToken.id;
-    next();
+    }
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (decodedToken.payload.exp && currentTime > decodedToken.payload.exp) {
+      return {
+        success: false,
+        message: "Token Expired",
+        userId: null,
+      };
+    }
+
+    const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+    if (!verifiedToken) {
+      return {
+        success: false,
+        message: "Invalid Token",
+        userId: null,
+      };
+    }
+    return {
+      success: true,
+      message: "Token verified successfully",
+      userId: verifiedToken.id,
+    };
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized: Token expired",
-      });
-    }
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized: Invalid token",
-      });
-    }
-    // For other errors, log the error and return a generic error message
-    console.error(error);
-    res.status(500).json({ success: false, message: "Internal server error" });
+    return {
+      success: false,
+      message: "Invalid Token",
+      userId: null,
+    };
   }
 };
+module.exports = getUserData;
 
-module.exports = authMiddleware;
+// const authMiddleware = async (req, res, next) => {
+//   const authHeader = req.headers.authorization;
+//   if (!authHeader) {
+//     return res.status(401).json({
+//       success: false,
+//       message: "Unauthorized: Token not provided",
+//     });
+//   }
+//   const token = authHeader.split(" ")[1];
+//   if (!token) {
+//     return res.status(401).json({
+//       success: false,
+//       message: "Unauthorized: Token format invalid",
+//     });
+//   }
+//   try {
+//     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+//     if (!verifiedToken)
+//       return {
+//         userId: null,
+//       };
+//     req.body.userId = verifiedToken.id;
+//     next();
+//   } catch (error) {
+//     if (error.name === "TokenExpiredError") {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Unauthorized: Token expired",
+//       });
+//     }
+//     if (error.name === "JsonWebTokenError") {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Unauthorized: Invalid token",
+//       });
+//     }
+//     // For other errors, log the error and return a generic error message
+//     console.error(error);
+//     res.status(500).json({ success: false, message: "Internal server error" });
+//   }
+// };
+
+// module.exports = authMiddleware;

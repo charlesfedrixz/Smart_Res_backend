@@ -10,6 +10,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
 require("dotenv").config();
+const bodyParser = require("body-parser");
 
 const { adminRoutes } = require("./routes/adminRoute");
 const { foodRoutes } = require("./routes/foodRoute");
@@ -31,6 +32,9 @@ app.use(
     credentials: true,
   })
 );
+app.use(bodyParser.json({ limit: "100mb" })); // Increase the limit to 100MB
+app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
+
 app.use(express.static("uploads"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
