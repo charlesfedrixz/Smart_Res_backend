@@ -72,24 +72,10 @@ const getCategory = asynchandler(async (req, res) => {
 //remove category
 const removeCategory = asynchandler(async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token." });
-    }
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token... " });
-    }
-    const verify = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verify) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid token please login again...",
-      });
+    const { success, message, userId } = getUserData(req.headers);
+    if (!success) {
+      const statusCode = message === "Token has expired " ? 401 : 400;
+      return res.status(statusCode).json({ success: false, message });
     }
     const { categoryId } = req.params;
     if (!categoryId) {
@@ -106,6 +92,7 @@ const removeCategory = asynchandler(async (req, res) => {
     return res.status(200).json({
       success: true,
       item,
+      userId,
       message: "Remove a category with success...",
     });
   } catch (error) {

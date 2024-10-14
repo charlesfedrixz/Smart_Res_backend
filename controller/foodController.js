@@ -8,30 +8,31 @@ require("dotenv").config();
 const { validationResult } = require("express-validator");
 const Category = require("../models/categoryModels");
 const asyncHandler = require("express-async-handler");
+const getUserData = require("../middleware/authUser");
 
-function getUserData(headers) {
-  // Split the Bearer token
-  const token = headers.authorization.split(" ")[1];
-  if (!token) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Token header missing", userId: null });
-  }
-  const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-  console.log(verifiedToken);
+// function getUserData(headers) {
+//   // Split the Bearer token
+//   const token = headers.authorization.split(" ")[1];
+//   if (!token) {
+//     return res
+//       .status(400)
+//       .json({ success: false, message: "Token header missing", userId: null });
+//   }
+//   const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+//   console.log(verifiedToken);
 
-  if (!verifiedToken)
-    return {
-      success: false,
-      message: "Invalid token",
-      userId: null,
-    };
-  return {
-    success: true,
-    message: "Token verified successfully",
-    userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
-  };
-}
+//   if (!verifiedToken)
+//     return {
+//       success: false,
+//       message: "Invalid token",
+//       userId: null,
+//     };
+//   return {
+//     success: true,
+//     message: "Token verified successfully",
+//     userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
+//   };
+// }
 
 const KEYFILEPATH = path.join(__dirname, "..", "cred.json");
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
@@ -58,9 +59,14 @@ const insertFile = async (fileObject) => {
 };
 const uploadFood = asyncHandler(async (req, res) => {
   try {
-    const { userId } = getUserData(req.headers);
+    const { success, message, userId } = getUserData(req.headers);
     const { name, description, category, price } = req.body;
     const image = req.file; // File path after upload
+    console.log("Data: ", name, description, category, price, image);
+    if (!success) {
+      const statusCode = message === "Token has expired " ? 401 : 400;
+      return res.status(statusCode).json({ success: false, message });
+    }
     if (!userId) {
       return res
         .status(400)
@@ -77,6 +83,7 @@ const uploadFood = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: "Error in file uploading" });
     }
+
     const newFood = await Food.create({
       name,
       description,
@@ -85,13 +92,16 @@ const uploadFood = asyncHandler(async (req, res) => {
       image: uploadDrive.id,
       userId,
     });
+    console.log(newFood);
     return res.status(200).json({
       success: true,
       newFood,
       message: "Food uploaded successfully",
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error });
+    return res
+      .status(500)
+      .json({ success: false, message: "Server Error", error });
   }
 });
 //list food
@@ -212,8 +222,11 @@ const editFood = async (req, res) => {
     return res.status(400).json({ success: false, errors: errors.array() });
   }
 
-  const { userId } = getUserData(req.headers);
-
+  const { success, message, userId } = getUserData(req.headers);
+  if (!success) {
+    const statusCode = message === "Token has expired " ? 401 : 400;
+    return res.status(statusCode).json({ success: false, message });
+  }
   console.log(userId);
   const { name, description, category, price } = req.body;
   const imagePath = req.file?.filename;
