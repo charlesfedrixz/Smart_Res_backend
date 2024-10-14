@@ -34,7 +34,15 @@ app.use(
 );
 app.use(bodyParser.json({ limit: "100mb" })); // Increase the limit to 100MB
 app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
-
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  next();
+});
 app.use(express.static("uploads"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));

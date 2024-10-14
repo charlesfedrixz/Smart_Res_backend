@@ -74,7 +74,7 @@ const uploadFood = asyncHandler(async (req, res) => {
     const uploadDrive = await insertFile(image);
     if (!uploadDrive) {
       return res
-        .status(500)
+        .status(400)
         .json({ success: false, message: "Error in file uploading" });
     }
     const newFood = await Food.create({
