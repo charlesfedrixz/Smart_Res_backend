@@ -1,12 +1,10 @@
 const Food = require("../models/foodModels");
 const fs = require("fs");
-const jwt = require("jsonwebtoken");
 const { google } = require("googleapis");
 const path = require("path");
 const stream = require("stream");
 require("dotenv").config();
 const { validationResult } = require("express-validator");
-const Category = require("../models/categoryModels");
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
 
@@ -34,28 +32,59 @@ const getUserData = require("../middleware/authUser");
 //   };
 // }
 
-const KEYFILEPATH = path.join(__dirname, "..", "cred.json");
-const SCOPES = ["https://www.googleapis.com/auth/drive"];
-const auth = new google.auth.GoogleAuth({
-  keyFile: KEYFILEPATH,
-  scopes: SCOPES,
-});
-const insertFile = async (fileObject) => {
-  const bufferStream = new stream.PassThrough();
-  bufferStream.end(fileObject.buffer);
-  const { data } = await google.drive({ version: "v3", auth }).files.create({
-    media: {
-      mimeType: fileObject.mimeType,
-      body: bufferStream,
-    },
-    requestBody: {
-      name: fileObject.originalname,
-      parents: ["1e8OIEcKOet5DJPbQ7JkIv-3gU7mIICTM"],
-    },
-    fields: "id, name",
+const CREDENTIALS_PATH = path.join(__dirname, "..", "cred.json");
+const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
+const TOKEN_PATH = path.join(__dirname, "token.json");
+
+function loadCredentials() {
+  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf8"));
+  const { client_secret, client_id, redirect_uris } =
+    credentials.inatalled || credentials.web;
+  return new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+}
+
+const oAuth2Client = loadCredentials();
+if (fs.existsSync(TOKEN_PATH)) {
+  const token = fs.readFileSync(TOKEN_PATH, "utf8");
+  oAuth2Client.setCredentials(JSON.parse(token));
+} else {
+  getAccessToken(oAuth2Client);
+}
+
+function getAccessToken(oAuth2Client) {
+  const authUrl = oAuth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: SCOPES,
   });
-  console.log("Insert File in drive successfully ");
-  return data;
+  console.log("Authorize thia app by visiting this url:", authUrl);
+}
+function saveToken(token) {
+  fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+  console.log("Token stored to", TOKEN_PATH);
+}
+const insertFile = async (fileObject) => {
+  try {
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(fileObject.buffer);
+    const { data } = await google
+      .drive({ version: "v3", auth: oAuth2Client })
+      .files.create({
+        media: {
+          mimeType: fileObject.mimeType,
+          body: bufferStream,
+        },
+        requestBody: {
+          name: fileObject.originalname,
+          parents: ["1e8OIEcKOet5DJPbQ7JkIv-3gU7mIICTM"],
+        },
+        fields: "id, name",
+      });
+    console.log("Insert File in drive successfully ");
+    return data;
+  } catch (error) {
+    console.log("Error uploading file to google Drive:", error);
+    throw error;
+  }
 };
 const uploadFood = asyncHandler(async (req, res) => {
   try {
