@@ -1,138 +1,137 @@
 const Food = require("../models/foodModels");
-const fs = require("fs");
-const { google } = require("googleapis");
-const path = require("path");
-const stream = require("stream");
 require("dotenv").config();
-const { validationResult } = require("express-validator");
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
+const cloudinary = require("cloudinary").v2;
 
-// function getUserData(headers) {
-//   // Split the Bearer token
-//   const token = headers.authorization.split(" ")[1];
-//   if (!token) {
-//     return res
-//       .status(400)
-//       .json({ success: false, message: "Token header missing", userId: null });
-//   }
-//   const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-//   console.log(verifiedToken);
-
-//   if (!verifiedToken)
-//     return {
-//       success: false,
-//       message: "Invalid token",
-//       userId: null,
-//     };
-//   return {
-//     success: true,
-//     message: "Token verified successfully",
-//     userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
-//   };
-// }
-
-const CREDENTIALS_PATH = path.join(__dirname, "..", "cred.json");
-const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
-const TOKEN_PATH = path.join(__dirname, "token.json");
-
-function loadCredentials() {
-  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf8"));
-  const { client_secret, client_id, redirect_uris } =
-    credentials.inatalled || credentials.web;
-  return new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-}
-
-const oAuth2Client = loadCredentials();
-if (fs.existsSync(TOKEN_PATH)) {
-  const token = fs.readFileSync(TOKEN_PATH, "utf8");
-  oAuth2Client.setCredentials(JSON.parse(token));
-} else {
-  getAccessToken(oAuth2Client);
-}
-
-function getAccessToken(oAuth2Client) {
-  const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: SCOPES,
-  });
-  console.log("Authorize thia app by visiting this url:", authUrl);
-}
-function saveToken(token) {
-  fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
-  console.log("Token stored to", TOKEN_PATH);
-}
-const insertFile = async (fileObject) => {
+// Configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+//insert food
+const insertFoodCloud = asyncHandler(async (req, res) => {
   try {
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(fileObject.buffer);
-    const { data } = await google
-      .drive({ version: "v3", auth: oAuth2Client })
-      .files.create({
-        media: {
-          mimeType: fileObject.mimeType,
-          body: bufferStream,
-        },
-        requestBody: {
-          name: fileObject.originalname,
-          parents: ["1e8OIEcKOet5DJPbQ7JkIv-3gU7mIICTM"],
-        },
-        fields: "id, name",
-      });
-    console.log("Insert File in drive successfully ");
-    return data;
-  } catch (error) {
-    console.log("Error uploading file to google Drive:", error);
-    throw error;
-  }
-};
-const uploadFood = asyncHandler(async (req, res) => {
-  try {
-    const { success, message, userId } = getUserData(req.headers);
-    const { name, description, category, price } = req.body;
-    const image = req.file; // File path after upload
-    console.log("Data: ", name, description, category, price, image);
-    if (!success) {
-      const statusCode = message === "Token has expired " ? 401 : 400;
-      return res.status(statusCode).json({ success: false, message });
-    }
+    const { userId } = getUserData(req.headers);
     if (!userId) {
       return res
         .status(400)
         .json({ success: false, message: "User Expired Please log in again" });
     }
+    const { name, description, category, price } = req.body;
+    const image = req.file; // File path after upload
+    console.log("Data: ", name, description, category, price, image);
+    console.log("token: ", userId);
+
     if (!name || !description || !category || !price || !image) {
       return res
         .status(400)
         .json({ success: false, message: "Please provide all the field..." });
     }
-    const uploadDrive = await insertFile(image);
-    if (!uploadDrive) {
+    // Upload image to Cloudinary
+    const cloudinaryUpload = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { resource_type: "image" },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+      // Stream the file to Cloudinary
+      if (image && image.buffer) {
+        uploadStream.end(image.buffer);
+      } else {
+        reject(new Error("Image upload failed"));
+      }
+    });
+
+    if (!cloudinaryUpload) {
       return res
         .status(400)
-        .json({ success: false, message: "Error in file uploading" });
+        .json({ success: false, message: "Error in uploading image." });
     }
 
+    // Create new food entry with the image URL from Cloudinary
     const newFood = await Food.create({
       name,
       description,
       category,
       price,
-      image: uploadDrive.id,
-      userId,
+      image: cloudinaryUpload.secure_url,
+      publicId: cloudinaryUpload.public_id, // Use the secure URL from Cloudinary
+      userId, // Assuming userId refers to the admin or the creator of the food item
     });
-    console.log(newFood);
+
+    // Send success response
     return res.status(200).json({
       success: true,
       newFood,
       message: "Food uploaded successfully",
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Server Error", error });
+    console.error("Error uploading food:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error. Please try again later.",
+      error: error.message,
+    });
   }
 });
+//delete food
+const deleteFood = async (req, res) => {
+  try {
+    const { userId, success, message } = getUserData(req.headers);
+    const { id } = req.body;
+    if (!userId) {
+      return res
+        .status(403)
+        .json({ success: false, message: "User Expired Please log in again" });
+    }
+    if (!success) {
+      const statusCode = message === "Token has expired " ? 401 : 400;
+      return res.status(statusCode).json({ success: false, message });
+    }
+    if (!id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide Food_id..." });
+    }
+    const food = await Food.findById(id);
+    if (!food) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Food is not found..." });
+    }
+    console.log("food: ", food);
+    const publicID = food.publicId;
+    console.log(publicID);
+    if (publicID) {
+      const result = await cloudinary.uploader.destroy(publicID);
+      if (result.result !== "ok") {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to delete image from Cloudinary",
+        });
+      }
+      await Food.findByIdAndDelete(id);
+      return res
+        .status(200)
+        .json({ success: true, message: "Food removed successfully..." });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "No image found for this food item",
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
 //list food
 const listFood = async (req, res) => {
   try {
@@ -158,49 +157,113 @@ const listFood = async (req, res) => {
     return res.status(500).json({ success: false, message: error });
   }
 };
-//remove food
-const removedFood = async (req, res) => {
+//edit food
+const editFood = async (req, res) => {
   try {
-    // const { userId } = getUserData(req.headers);
-    const { id } = req.body;
-    // if (!userId) {
-    //   return res
-    //     .status(403)
-    //     .json({ success: false, message: "User Expired Please log in again" });
-    // }
-    if (!id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide Food_id..." });
+    const { userId, success, message } = getUserData(req.headers);
+    const { id, name, description, category, price, publicId } = req.body; // New values
+    const image = req.file; // New image if uploaded
+
+    // Check if user is authenticated
+    if (!userId) {
+      return res.status(403).json({
+        success: false,
+        message: "User Expired. Please log in again.",
+      });
     }
+
+    // Check for token success
+    if (!success) {
+      const statusCode = message === "Token has expired" ? 401 : 400;
+      return res.status(statusCode).json({ success: false, message });
+    }
+
+    // Check if food ID is provided
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide Food ID...",
+      });
+    }
+
+    // Find the food item in the database
     const food = await Food.findById(id);
     if (!food) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Food is not found..." });
+      return res.status(404).json({
+        success: false,
+        message: "Food item not found...",
+      });
     }
-    // fs.unlink(`uploads/${food.image}`, () => {});
-    const driveUpload = google.drive({ version: "v3", auth });
-    await driveUpload.files.delete({ fileId: food.image });
-    await Food.findByIdAndDelete(id);
-    return res
-      .status(200)
-      .json({ success: true, message: "Food removed successfully..." });
+
+    // Update the food item fields
+    food.name = name || food.name; // Update only if a new value is provided
+    food.description = description || food.description;
+    food.category = category || food.category;
+    food.price = price || food.price;
+
+    // If a new image is provided, handle the image upload
+    if (image) {
+      if (publicId) {
+        // Delete the old image from Cloudinary
+        const result = await cloudinary.uploader.destroy(publicId);
+        if (result.result !== "ok") {
+          return res.status(500).json({
+            success: false,
+            message: "Failed to delete old image from Cloudinary",
+          });
+        }
+
+        // Upload new image to Cloudinary
+        const cloudinaryUpload = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { resource_type: "image" },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result);
+              }
+            }
+          );
+
+          // Stream the file to Cloudinary
+          if (image && image.buffer) {
+            uploadStream.end(image.buffer);
+          } else {
+            reject(new Error("Image upload failed"));
+          }
+        });
+
+        // Update the food item's image URL and public ID
+        food.image = cloudinaryUpload.secure_url; // Update the URL
+        food.publicId = cloudinaryUpload.public_id; // Store the new public ID
+      }
+    } else {
+      food.publicId = food.publicId; // This line ensures publicId isn't undefined
+    }
+
+    // Save the updated food item
+    await food.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Food item updated successfully",
+      food,
+    });
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    console.error("Error updating food:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error. Please try again later.",
+      error: error.message,
+    });
   }
 };
 
+//list food by category
 const getFoodByCategory = async (req, res) => {
   try {
-    //const { userId } = getUserData(req.headers);
     const { category } = req.query; // Assuming the category is passed as a query parameter
-    // if (!userId) {
-    //   return res
-    //     .status(403)
-    //     .json({ success: false, message: "User Expired Please log in again" });
-    // }
     if (!category) {
       return res.status(400).json({ msg: "Category is required" });
     }
@@ -222,7 +285,7 @@ const getFoodByCategory = async (req, res) => {
       .json({ msg: `Error fetching food items by category: ${error.message}` });
   }
 };
-
+//search food
 const searchFood = async (req, res) => {
   try {
     const { foodName } = req.query;
@@ -244,67 +307,12 @@ const searchFood = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
-//edit food
-const editFood = async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
-  }
 
-  const { success, message, userId } = getUserData(req.headers);
-  if (!success) {
-    const statusCode = message === "Token has expired " ? 401 : 400;
-    return res.status(statusCode).json({ success: false, message });
-  }
-  console.log(userId);
-  const { name, description, category, price } = req.body;
-  const imagePath = req.file?.filename;
-  const { id } = req.params;
-  if (!id || !name || !description || !category || !price) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Please provide all fields." });
-  }
-  console.log(id, name, description, category, price);
-  try {
-    const food = await Food.findById(id);
-    if (!food) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Food not found" });
-    }
-    console.log(food);
-    if (food.userId.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to edit this food item",
-      });
-    }
-
-    const updatedData = { name, description, category, price };
-    if (imagePath) {
-      fs.unlink(`uploads/${food.image}`, () => {});
-      updatedData.image = imagePath;
-    }
-    console.log(updatedData);
-    const updatedFood = await Food.findByIdAndUpdate(id, updatedData, {
-      new: true,
-    });
-    console.log("object update");
-    return res.status(200).json({
-      success: true,
-      updatedFood,
-      message: "Food updated successfully",
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: "Server Error" });
-  }
-};
 module.exports = {
-  uploadFood: uploadFood,
-  listFood: listFood,
-  removedFood: removedFood,
-  getFoodByCategory: getFoodByCategory,
-  searchFood: searchFood,
-  editFood: editFood,
+  listFood,
+  getFoodByCategory,
+  searchFood,
+  editFood,
+  insertFoodCloud,
+  deleteFood,
 };

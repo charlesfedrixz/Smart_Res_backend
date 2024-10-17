@@ -1,24 +1,23 @@
 const express = require("express");
 const {
-  uploadFood,
   listFood,
-  removedFood,
   getFoodByCategory,
   searchFood,
   editFood,
+  insertFoodCloud,
+  deleteFood,
 } = require("../controller/foodController");
 const multer = require("multer");
-const { auth } = require("../middleware/checkAuth");
 
 const foodRoutes = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 // Route to handle food upload
-foodRoutes.post("/uploadFood", upload.single("image"), uploadFood);
 foodRoutes.get("/foodList", listFood);
-foodRoutes.delete("/remove", removedFood);
+foodRoutes.delete("/remove", deleteFood);
 foodRoutes.get("/search", getFoodByCategory);
 foodRoutes.get("/find", searchFood);
-foodRoutes.put("/edit/:id", upload.single("image"), editFood);
+foodRoutes.put("/edit", upload.single("image"), editFood);
+foodRoutes.post("/upload", upload.single("image"), insertFoodCloud);
 module.exports = { foodRoutes: foodRoutes };

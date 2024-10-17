@@ -1,6 +1,7 @@
 const Category = require("../models/categoryModels");
 const jwt = require("jsonwebtoken");
 const asynchandler = require("express-async-handler");
+const getUserData = require("../middleware/authUser");
 
 //create category
 const createCategory = asynchandler(async (req, res) => {
@@ -102,24 +103,10 @@ const removeCategory = asynchandler(async (req, res) => {
 //upadte category
 const updateCategory = asynchandler(async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token." });
-    }
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token... " });
-    }
-    const verify = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verify) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid token please login again...",
-      });
+    const { success, message, userId } = getUserData(req.headers);
+    if (!success) {
+      const statusCode = message === "Token has expired " ? 401 : 400;
+      return res.status(statusCode).json({ success: false, message, userId });
     }
     const { categoryId } = req.params;
     const { category } = req.body;

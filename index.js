@@ -1,7 +1,6 @@
 //create a server
 const http = require("http");
 const { Server } = require("socket.io");
-const punycode = require("punycode/");
 
 const express = require("express");
 const app = express();
@@ -72,9 +71,6 @@ io.on("connection", (socket) => {
     socket.join(customerId);
     console.log(`Customer ${socket.id} joined room ${customerId}`);
     io.to(customerId).emit("test", "world");
-    // console.log(" connected", socket.id);
-
-    // socket.broadcast.emit(customerId);
   });
   //leave channel
   socket.on("leave room", (customerId) => {
@@ -112,22 +108,13 @@ io.on("connection", (socket) => {
     io.emit("send", "newOrder");
   });
 
-  // socket.on("updateOrderStatus", (payload) => {
-  //   console.log("🚀 ~ socket.on ~ payload:", payload);
-  //   updateOrderBySocket(payload?.orderId, payload?.newStatus, io);
-  // });
-  // socket.on("updatePaymentStatus", (payload) => {
-  //   console.log("🚀 ~ socket.on ~ payload:", payload);
-  //   updateOrderPaymentBySocket(payload?.orderId, payload.paid, io);
-  // });
-
   // Handle client disconnection
   socket.on("disconnect", () => {
     console.log("Admin disconnected");
   });
 });
 
-app.get("/", (req, res) => {
+app.get("/", (res) => {
   res.status(200).json({
     success: true,
     message: "Server of your Smart Restaurant is running...",
@@ -142,10 +129,3 @@ server.listen(app.get("port"), () => {
     )}`
   );
 });
-
-// const port = process.env.PORT || 3002;
-// server.listen(port, () => {
-//   console.log(
-//     `Server of your Smart Restaurant is running on http://localhost:${port}`
-//   );
-// });

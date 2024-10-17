@@ -1,11 +1,68 @@
 const jwt = require("jsonwebtoken");
 
+// const getUserData = (headers) => {
+//   // Extract the token from the Authorization header
+//   const token = headers?.authorization?.split(" ")[1];
+//   console.log("Received token:", token);
+//   if (!token) {
+//     return {
+//       success: false,
+//       message: "No token provided",
+//       userId: null,
+//       token: null,
+//     };
+//   }
+
+//   try {
+//     console.log("Verifying token...");
+
+//     // Verify the token and get the payload
+//     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+//     console.log("Token verified:", verifiedToken);
+
+//     // Return success with the user's ID
+//     return {
+//       success: true,
+//       message: "Token verified successfully",
+//       userId: verifiedToken.id, // Assuming the user ID is stored as 'id'
+//     };
+//   } catch (error) {
+//     console.error("Error verifying token:", error); // Log the full error object
+
+//     if (error.name === "TokenExpiredError") {
+//       return {
+//         success: false,
+//         message: "Token expired",
+//         userId: null,
+//       };
+//     }
+
+//     if (error.name === "JsonWebTokenError") {
+//       return {
+//         success: false,
+//         message: "Invalid token",
+//         userId: null,
+//       };
+//     }
+
+//     // For other unexpected errors
+//     return {
+//       success: false,
+//       message: "Server error during token processing",
+//       userId: null,
+//       error: error.message,
+//     };
+//   }
+// };
+
+// module.exports = getUserData;
+
 const getUserData = (headers) => {
   const token = headers?.authorization?.split(" ")[1];
   if (!token) {
     return {
       success: false,
-      message: "Invalid token",
+      message: "Invalid token in split",
       userId: null,
       token: null,
     };
@@ -15,7 +72,7 @@ const getUserData = (headers) => {
     if (!decodedToken) {
       return {
         success: false,
-        message: "Invalid Token",
+        message: "Invalid Token in decode",
         userId: null,
       };
     }
@@ -27,12 +84,11 @@ const getUserData = (headers) => {
         userId: null,
       };
     }
-
     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (!verifiedToken) {
       return {
         success: false,
-        message: "Invalid Token",
+        message: "Invalid Token in verify",
         userId: null,
       };
     }
@@ -44,8 +100,9 @@ const getUserData = (headers) => {
   } catch (error) {
     return {
       success: false,
-      message: "Invalid Token",
+      message: "Server Error",
       userId: null,
+      error,
     };
   }
 };

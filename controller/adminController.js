@@ -7,54 +7,6 @@ const nodemailer = require("nodemailer");
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
 
-// function getUserData(headers) {
-//   const token = headers?.authorization?.split(" ")[1];
-//   if (!token)
-//     return {
-//       success: false,
-//       message: "Invalid token",
-//       userId: null,
-//       token: null,
-//     };
-
-//   try {
-//     const decodedToken = jwt.decode(token, { complete: true });
-//     if (!decodedToken) {
-//       return {
-//         success: false,
-//         message: "Invalid Token",
-//         userId: null,
-//       };
-//     }
-//     const currentTime = Math.floor(Date.now() / 1000);
-//     if (decodedToken.payload.exp && currentTime > decodedToken.payload.exp) {
-//       return {
-//         success: false,
-//         message: "Token has expired",
-//         userId: null,
-//       };
-//     }
-//     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-
-//     if (!verifiedToken)
-//       return {
-//         success: false,
-//         message: "Invalid token",
-//         userId: null,
-//       };
-//     return {
-//       success: true,
-//       message: "Token verified successfully",
-//       userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
-//     };
-//   } catch (error) {
-//     return {
-//       success: false,
-//       message: "Invalid Token",
-//       userId: null,
-//     };
-//   }
-// }
 //create user
 const createUser = asyncHandler(async (req, res) => {
   try {
@@ -129,6 +81,7 @@ const login = asyncHandler(async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+    console.log("Generated token:", token);
     console.log(existingUser);
     res.status(201).json({
       success: true,
@@ -138,7 +91,7 @@ const login = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: error });
+    return res.status(500).json({ success: false, message: "server Error" });
 
     // throwError("Server", 500, false);
   }

@@ -19,6 +19,10 @@ const foodSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  publicId: {
+    type: String,
+    required: true,
+  },
   price: {
     type: Number,
     required: true,
