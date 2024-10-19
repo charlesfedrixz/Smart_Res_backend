@@ -3,6 +3,8 @@ const customer = require("../models/customerModel");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const twilio = require("twilio");
+const AppError = require("../middleware/errorHandler");
+const sendResponse = require("../middleware/sendResponse");
 
 const countryCode = "+91";
 const generateOTP = () => {
@@ -30,19 +32,17 @@ async function sendOTPSMS(mobileNumber, otp) {
     console.error(error);
   }
 }
-const resendOtp = asyncHandler(async (req, res) => {
+const resendOtp = asyncHandler(async (req, res, next) => {
   try {
     const { mobileNumber } = req.body;
     if (!mobileNumber) {
-      return res.status(400).json({ msg: "Please provide a mobile number." });
+      return next(new AppError("Please provide a mobile number.", 400));
     }
     const user = await customer.findOne({
       mobileNumber,
     });
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found." });
+      return next(new AppError("User not found.", 400));
     }
     const otp = generateOTP();
     user.isVerified = false;
@@ -50,44 +50,31 @@ const resendOtp = asyncHandler(async (req, res) => {
     user.otpExpire = Date.now() + 1000 * 60 * 5;
     await user.save();
     await sendOTPSMS(mobileNumber, otp);
-    return res.status(200).json({
-      success: true,
-      user,
-      message: "Resend OTP with success.",
-    });
+    return sendResponse(res, true, 200, "Resend OTP with success.", { user });
   } catch (error) {
     console.error("Error sending SMS:", error);
-    return res.status(500).json({
-      success: false,
-      message: error,
-    });
+    return next(new AppError("Server Error", 500));
   }
 });
-const deleteAccount = asyncHandler(async (req, res) => {
+const deleteAccount = asyncHandler(async (req, res, next) => {
   const { currentTableNumber } = req.body;
-  console.log(currentTableNumber);
   try {
     const user = await customer.findOne({
       currentTableNumber,
     });
-    console.log("user", user);
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found." });
+      return next(new AppError("User not found.", 400));
     }
-    // await Order.deleteMany({ customerId: user._id });
     await customer.deleteOne({ _id: user._id });
-    return res.status(200).json({
-      message: "Account and associated orders deleted successfully.",
-      success: true,
-    });
+    return sendResponse(
+      res,
+      true,
+      200,
+      "Account and associated orders deleted successfully."
+    );
   } catch (error) {
     console.error(error.message);
-    return res.status(500).json({
-      success: false,
-      message: error,
-    });
+    return next(new AppError("Server Error", 500));
   }
 });
 
@@ -138,21 +125,20 @@ const OtpVerify = async (req, res) => {
   }
 };
 
-const Register = asyncHandler(async (req, res) => {
+const Register = asyncHandler(async (req, res, next) => {
   try {
     const { mobileNumber, currentTableNumber } = req.body;
     if (!mobileNumber || !currentTableNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide a Mobile Number",
-      });
+      return next(new AppError("Please provide a Mobile Number", 400));
     }
     const customerFind = await customer.findOne({ mobileNumber });
     if (customerFind && customerFind.currentTableNumber != currentTableNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "Table's occupied by another customer try a new table",
-      });
+      return next(
+        new AppError(
+          "Table's occupied by another customer try a new table",
+          400
+        )
+      );
     } else if (
       customerFind &&
       customerFind.currentTableNumber == currentTableNumber
@@ -163,12 +149,13 @@ const Register = asyncHandler(async (req, res) => {
       await customerFind.save();
       //send otp function
       await sendOTPSMS(mobileNumber, otp);
-      return res.status(200).json({
-        success: true,
-        token: null,
-        message:
-          "OTP pppp is send and register with success for existing user ",
-      });
+      return sendResponse(
+        res,
+        true,
+        200,
+        "OTP pppp is send and register with success for existing user ",
+        { token: null }
+      );
     }
 
     const otp = generateOTP();
@@ -180,15 +167,16 @@ const Register = asyncHandler(async (req, res) => {
     });
     //send otp function
     await sendOTPSMS(mobileNumber, otp);
-    return res.status(200).json({
-      success: true,
-      Data: newCustomer,
-      token: null,
-      message: "Register a new customer and OTP is send with success",
-    });
+    return sendResponse(
+      res,
+      true,
+      200,
+      "Register a new customer and OTP is send with success",
+      { Data: newCustomer }
+    );
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: error });
+    return next(new AppError("Server Error", 500));
   }
 });
 module.exports = {

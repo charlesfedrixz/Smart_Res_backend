@@ -5,9 +5,9 @@ name: Node.js CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -19,24 +19,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-          
+          cache: "npm"
+
       - name: Install dependencies with increased memory
         run: node --max-old-space-size=4096 $(which npm) install
 
       - name: Touch .env and set environment variable
         run: |
           echo "${{ secrets.PROD_ENV_FILE }}" > .env
-          
-      - name: Create cred.json file from secret
-        run: |
-          echo "${{ secrets.PROD_CRED_FILE }}" > cred.json
 
- 
-
-
+      - name: Restart application using PM2
+        run: pm2 restart smart-restaurant

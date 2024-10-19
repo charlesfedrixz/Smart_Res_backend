@@ -3,6 +3,8 @@ require("dotenv").config();
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
 const cloudinary = require("cloudinary").v2;
+const sendResponse = require("../middleware/sendResponse");
+const AppError = require("../middleware/errorHandler");
 
 // Configuration
 cloudinary.config({
@@ -11,23 +13,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 //insert food
-const insertFoodCloud = asyncHandler(async (req, res) => {
+const insertFoodCloud = asyncHandler(async (req, res, next) => {
   try {
     const { userId } = getUserData(req.headers);
     if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User Expired Please log in again" });
+      return next(new AppError("User Expired Please log in again", 400));
     }
     const { name, description, category, price } = req.body;
-    const image = req.file; // File path after upload
-    console.log("Data: ", name, description, category, price, image);
-    console.log("token: ", userId);
+    const image = req.file;
 
     if (!name || !description || !category || !price || !image) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide all the field..." });
+      return next(new AppError("Please provide all the field...", 400));
     }
     // Upload image to Cloudinary
     const cloudinaryUpload = await new Promise((resolve, reject) => {
@@ -50,9 +46,7 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
     });
 
     if (!cloudinaryUpload) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Error in uploading image." });
+      return next(new AppError("Error in uploading image.", 400));
     }
 
     // Create new food entry with the image URL from Cloudinary
@@ -65,87 +59,58 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
       publicId: cloudinaryUpload.public_id, // Use the secure URL from Cloudinary
       userId, // Assuming userId refers to the admin or the creator of the food item
     });
-
     // Send success response
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Food uploaded successfully", {
       newFood,
-      message: "Food uploaded successfully",
     });
   } catch (error) {
     console.error("Error uploading food:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error. Please try again later.",
-      error: error.message,
-    });
+    return next(new AppError("Server Error", 500));
   }
 });
 //delete food
-const deleteFood = async (req, res) => {
+const deleteFood = async (req, res, next) => {
   try {
     const { userId, success, message } = getUserData(req.headers);
     const { id } = req.body;
     if (!userId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "User Expired Please log in again" });
+      return next(new AppError("User Expired Please log in again", 403));
     }
     if (!success) {
       const statusCode = message === "Token has expired " ? 401 : 400;
       return res.status(statusCode).json({ success: false, message });
     }
     if (!id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide Food_id..." });
+      return next(new AppError("Please provide Food_id...", 400));
     }
     const food = await Food.findById(id);
     if (!food) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Food is not found..." });
+      return next(new AppError("Food is not found...", 400));
     }
-    console.log("food: ", food);
     const publicID = food.publicId;
-    console.log(publicID);
     if (publicID) {
       const result = await cloudinary.uploader.destroy(publicID);
       if (result.result !== "ok") {
-        return res.status(500).json({
-          success: false,
-          message: "Failed to delete image from Cloudinary",
-        });
+        return next(
+          new AppError("Failed to delete image from Cloudinary", 500)
+        );
       }
       await Food.findByIdAndDelete(id);
-      return res
-        .status(200)
-        .json({ success: true, message: "Food removed successfully..." });
+      return sendResponse(res, true, 200, "Food removed successfully...");
     } else {
-      return res.status(400).json({
-        success: false,
-        message: "No image found for this food item",
-      });
+      return next(new AppError("No image found for this food item", 400));
     }
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 };
 //list food
-const listFood = async (req, res) => {
+const listFood = async (req, res, next) => {
   try {
-    // const { userId } = getUserData(req.headers);
     const foods = await Food.find({}).populate("userId", "email");
-    // if (!userId) {
-    //   return res
-    //     .status(403)
-    //     .json({ success: false, message: "User Expired Please log in again" });
-    // }
     if (!foods) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Food is not found..." });
+      return next(new AppError("Food is not found...", 400));
     }
     return res.status(200).json({
       success: true,
@@ -154,22 +119,20 @@ const listFood = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: error });
+    return next(new AppError("Server Error", 500));
   }
 };
 //edit food
-const editFood = async (req, res) => {
+const editFood = async (req, res, next) => {
   try {
     const { userId, success, message } = getUserData(req.headers);
-    const { id, name, description, category, price, publicId } = req.body; // New values
+    const { id } = req.params;
+    const { name, description, category, price, publicId } = req.body; // New values
     const image = req.file; // New image if uploaded
 
     // Check if user is authenticated
     if (!userId) {
-      return res.status(403).json({
-        success: false,
-        message: "User Expired. Please log in again.",
-      });
+      return next(new AppError("Token Error. Please log in again.", 403));
     }
 
     // Check for token success
@@ -180,19 +143,16 @@ const editFood = async (req, res) => {
 
     // Check if food ID is provided
     if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide Food ID...",
-      });
+      return next(new AppError("Please provide Food ID...", 400));
+    }
+    if (!name || !description || !category || !price || !publicId) {
+      return next(new AppError("Please provide ll fields", 400));
     }
 
     // Find the food item in the database
     const food = await Food.findById(id);
     if (!food) {
-      return res.status(404).json({
-        success: false,
-        message: "Food item not found...",
-      });
+      return next(new AppError("Food item not found...", 400));
     }
 
     // Update the food item fields
@@ -207,12 +167,10 @@ const editFood = async (req, res) => {
         // Delete the old image from Cloudinary
         const result = await cloudinary.uploader.destroy(publicId);
         if (result.result !== "ok") {
-          return res.status(500).json({
-            success: false,
-            message: "Failed to delete old image from Cloudinary",
-          });
+          return next(
+            new AppError("Failed to delete old image from Cloudinary", 500)
+          );
         }
-
         // Upload new image to Cloudinary
         const cloudinaryUpload = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
@@ -241,52 +199,38 @@ const editFood = async (req, res) => {
     } else {
       food.publicId = food.publicId; // This line ensures publicId isn't undefined
     }
-
-    // Save the updated food item
     await food.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Food item updated successfully",
+    return sendResponse(res, true, 200, "Food item updated successfully", {
       food,
     });
   } catch (error) {
     console.error("Error updating food:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error. Please try again later.",
-      error: error.message,
-    });
+    return next(new AppError("Server error. Please try again later.", 500));
   }
 };
 
 //list food by category
-const getFoodByCategory = async (req, res) => {
+const getFoodByCategory = async (req, res, next) => {
   try {
     const { category } = req.query; // Assuming the category is passed as a query parameter
     if (!category) {
-      return res.status(400).json({ msg: "Category is required" });
+      return next(new AppError("Category is required", 400));
     }
     const foodItems = await Food.find({ userId: userId, category: category });
     if (!foodItems || foodItems.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Category is not fouond in the food list...",
-      });
+      return next(
+        new AppError("Category is not fouond in the food list...", 404)
+      );
     }
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, `${category} category is listed...`, {
       foodItems,
-      message: `${category} category is listed...`,
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ msg: `Error fetching food items by category: ${error.message}` });
+    return next(new AppError("Server error. Please try again later.", 500));
   }
 };
 //search food
-const searchFood = async (req, res) => {
+const searchFood = async (req, res, next) => {
   try {
     const { foodName } = req.query;
     const food = await Food.find({ name: { $regex: foodName, $options: "i" } });
@@ -300,11 +244,9 @@ const searchFood = async (req, res) => {
         .status(200)
         .json({ success: true, message: "Food is not found", food: [] });
     }
-    return res
-      .status(200)
-      .json({ success: true, message: "Food is here...", food });
+    return sendResponse(res, true, 200, "Food is here...", { food });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server error. Please try again later.", 500));
   }
 };
 

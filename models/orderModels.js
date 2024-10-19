@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Food = require("./foodModels");
-const { Invoice } = require("./invoicemodel");
 const orderSchema = new mongoose.Schema(
   {
     customerId: {
@@ -73,9 +72,7 @@ orderSchema.methods.updatePaymentMode = async function (payment_mode) {
 orderSchema.methods.updateStatusPayment = async function (paid) {
   if (paid) {
     this.payment = "Paid";
-    // await Invoice.updateStatus("Paid");
   } else this.payment = "Unpaid";
-  // await Invoice.updateStatus("Pending");
   await this.save();
 };
 

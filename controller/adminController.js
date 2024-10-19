@@ -6,38 +6,31 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
+const sendResponse = require("../middleware/sendResponse");
+const AppError = require("../middleware/errorHandler");
 
 //create user
-const createUser = asyncHandler(async (req, res) => {
+const createUser = asyncHandler(async (req, res, next) => {
   try {
     const { email, password } = req.body;
     // Basic validation
     if (!email && !password) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide all fields." });
+      return next(new AppError("Please provide all fields.", 400));
     }
     //validation for email
     if (!validator.isEmail(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Please enter a valid email..",
-      });
+      return next(new AppError("Please enter a valid email..", 400));
     }
     //validation for password
     if (password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: "Please enter password minimum 8 length..",
-      });
+      return next(
+        new AppError("Please enter password minimum 8 length..", 400)
+      );
     }
-
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is already registered." });
+      return next(new AppError("Email is already registered.", 400));
     }
 
     //hashing password
@@ -46,54 +39,41 @@ const createUser = asyncHandler(async (req, res) => {
 
     //Create a new user
     const newUser = await User.create({ email, password: hashedPassword });
-    return res.status(200).json({
+    return sendResponse(res, true, 200, "Admin signed up successfully.", {
       newUser,
-      success: true,
-      message: "Admin signed up successfully.",
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: error });
+    return next(new AppError("Server Error", 500));
   }
 });
 
 //login
-const login = asyncHandler(async (req, res) => {
+const login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
-  console.log(email, password);
   try {
     const existingUser = await User.findOne({ email });
     // Check if user exists
     if (!existingUser) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Admin does not exits" });
+      return next(new AppError("Admin does not exits", 404));
     }
     // Compare passwords
     const matchPassword = await bcrypt.compare(password, existingUser.password);
     if (!matchPassword) {
-      return res
-        .status(400)
-        .json({ success: false, matchPassword, message: "Invalid password" });
+      return next(new AppError("Invalid password", 400));
     }
     const token = jwt.sign(
       { email: existingUser.email, id: existingUser._id },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
-    console.log("Generated token:", token);
-    console.log(existingUser);
-    res.status(201).json({
-      success: true,
+    return sendResponse(res, true, 201, "Admin Login successfull.", {
       token,
       email,
-      message: "Admin Login successfull...",
     });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: "server Error" });
-
-    // throwError("Server", 500, false);
+    return next(new AppError("Server Error", 500));
   }
 });
 
@@ -109,14 +89,12 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const requestPasswordReset = asyncHandler(async (req, res) => {
+const requestPasswordReset = asyncHandler(async (req, res, next) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Email not found" });
+      return next(new AppError("Email not found", 404));
     }
     const generateOTP = () => {
       return crypto.randomInt(100000, 999999).toString();
@@ -142,31 +120,25 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
       This code will expire in 1 hours.`,
     };
     await transporter.sendMail(mailOptions);
-    return res
-      .status(200)
-      .json({ success: true, message: "Password reset link sent" });
+    return sendResponse(res, true, 201, "Password reset link sent", {});
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 });
 
-const verifiedEmailOTP = asyncHandler(async (req, res) => {
+const verifiedEmailOTP = asyncHandler(async (req, res, next) => {
   try {
     const { email, otp } = req.body;
     if (!otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide OTP." });
+      return next(new AppError("Please provide OTP.", 400));
     }
     const finduser = await User.findOne({ email });
     if (!finduser) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found." });
+      return next(new AppError("User not found.", 400));
     }
     if (finduser.otp !== otp || finduser.otpExpire < Date.now()) {
-      return res.status(400).json({ success: false, message: "Invalid OTP" });
+      return next(new AppError("Invalid OTP", 400));
     }
     const token = jwt.sign({ id: finduser._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
@@ -175,48 +147,36 @@ const verifiedEmailOTP = asyncHandler(async (req, res) => {
     finduser.otp = undefined;
     finduser.otpExpire = undefined;
     await finduser.save();
-    return res
-      .status(200)
-      .json({ success: true, token, message: "OTP verified successfully" });
+    return sendResponse(res, true, 200, "OTP verified successfully", { token });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 });
 //reset password
-const resetPassword = asyncHandler(async (req, res) => {
+const resetPassword = asyncHandler(async (req, res, next) => {
   const { userId } = getUserData(req.headers);
   console.log("token:", userId);
   if (!userId) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid or Expired token" });
+    return next(new AppError("Invalid or Expired token", 400));
   }
   const { newPassword, confirmNewPassword } = req.body;
   if (!newPassword || !confirmNewPassword) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Provide a new password" });
+    return next(new AppError("Provide a new password", 400));
   }
   try {
     const user = await User.findById({ _id: userId, isOTPVerified: true });
     console.log(user);
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found" });
+      return next(new AppError("User not found", 400));
     }
     if (newPassword !== confirmNewPassword) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Password does not match" });
+      return next(new AppError("Password does not match", 400));
     }
     user.password = await bcrypt.hash(confirmNewPassword, 10);
     user.isResetPasswordVerified = true;
     await user.save();
-    return res
-      .status(200)
-      .json({ success: true, message: "Password reset successfully" });
+    return sendResponse(res, true, 200, "Password reset successfully", {});
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Server Error" });
@@ -224,26 +184,20 @@ const resetPassword = asyncHandler(async (req, res) => {
 });
 
 //logout
-const logout = asyncHandler(async (req, res) => {
+const logout = asyncHandler(async (req, res, next) => {
   try {
     const { success, message, userId } = getUserData(req.headers);
-    console.log(userId);
     if (!success) {
       const statusCode = message === "Token has expired " ? 401 : 400;
       return res.status(statusCode).json({ success: false, message });
     }
     if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token... " });
+      return next(new AppError("Please Provide token", 400));
     }
     const user = await User.findById(userId);
     console.log("user:", user);
     if (!user) {
-      return res.status(403).json({
-        success: false,
-        message: "User not found. Please log in again",
-      });
+      return next(new AppError("User not found. Please log in again", 403));
     }
     // Assuming the token is part of the authorization header
     const token = req.headers.authorization.split(" ")[1];
@@ -255,12 +209,10 @@ const logout = asyncHandler(async (req, res) => {
     // Remove the token from the user's tokens array
     user.tokens = user.tokens.filter((t) => t.token !== token);
     await user.save();
-    return res
-      .status(200)
-      .json({ success: true, message: "Successfully logged out" });
+    return sendResponse(res, true, 200, "Successfully logged out", {});
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: error });
+    return next(new AppError("Server Error", 500));
   }
 });
 

@@ -18,6 +18,6 @@ foodRoutes.get("/foodList", listFood);
 foodRoutes.delete("/remove", deleteFood);
 foodRoutes.get("/search", getFoodByCategory);
 foodRoutes.get("/find", searchFood);
-foodRoutes.put("/edit", upload.single("image"), editFood);
+foodRoutes.put("/edit/:id", upload.single("image"), editFood);
 foodRoutes.post("/upload", upload.single("image"), insertFoodCloud);
 module.exports = { foodRoutes: foodRoutes };

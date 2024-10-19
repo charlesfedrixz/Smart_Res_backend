@@ -1,77 +1,61 @@
 const Category = require("../models/categoryModels");
-const jwt = require("jsonwebtoken");
 const asynchandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
+const AppError = require("../middleware/errorHandler");
+const sendResponse = require("../middleware/sendResponse");
 
 //create category
-const createCategory = asynchandler(async (req, res) => {
+const createCategory = asynchandler(async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token." });
+    const { success, message, userId } = getUserData(req.headers);
+    if (!userId) {
+      return next(new AppError("Token Error", 400));
     }
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token... " });
-    }
-    const verify = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verify) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid token please login again...",
-      });
+    if (!success) {
+      const statusCode = message === "Token has expired" ? 401 : 400;
+      return res.status(statusCode).json({ success: false, message });
     }
     const { category } = req.body;
     console.log(category);
     if (!category) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Provide a category..." });
+      return next(new AppError("Provide a category...", 400));
     }
     const categoryFind = await Category.findOne({ category });
-    {
-      if (categoryFind) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Category is already created..." });
-      }
+    if (categoryFind) {
+      return sendResponse(
+        res,
+        false,
+        400,
+        "Category is already created...",
+        {}
+      );
     }
     const newCategory = await Category.create({ category });
-    console.log(newCategory);
-    return res.status(201).json({
-      success: true,
-      message: "Category created success",
-      data: newCategory,
+    return sendResponse(res, true, 201, "Category created success", {
+      newCategory,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 });
 
-const getCategory = asynchandler(async (req, res) => {
+const getCategory = asynchandler(async (req, res, next) => {
   try {
     const list = await Category.find({});
     if (!list) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Category is not found..." });
+      return next(new AppError("Category is not found...", 400));
     }
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Listed a category with success...", {
       list,
-      message: "Listed a category with success...",
     });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+
+    return next(new AppError("Server Error", 500));
   }
 });
 //remove category
-const removeCategory = asynchandler(async (req, res) => {
+const removeCategory = asynchandler(async (req, res, next) => {
   try {
     const { success, message, userId } = getUserData(req.headers);
     if (!success) {
@@ -80,28 +64,22 @@ const removeCategory = asynchandler(async (req, res) => {
     }
     const { categoryId } = req.params;
     if (!categoryId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide category..." });
+      return next(new AppError("Please provide category...", 400));
     }
     const item = await Category.findByIdAndDelete(categoryId);
     if (!item) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Category is not found..." });
+      return next(new AppError("Category is not found...", 400));
     }
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Remove a category with success...", {
       item,
       userId,
-      message: "Remove a category with success...",
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 });
 //upadte category
-const updateCategory = asynchandler(async (req, res) => {
+const updateCategory = asynchandler(async (req, res, next) => {
   try {
     const { success, message, userId } = getUserData(req.headers);
     if (!success) {
@@ -111,14 +89,10 @@ const updateCategory = asynchandler(async (req, res) => {
     const { categoryId } = req.params;
     const { category } = req.body;
     if (!category) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide category..." });
+      return next(new AppError("Please provide category...", 400));
     }
     if (!categoryId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide category Id..." });
+      return next(new AppError("Please provide category Id...", 400));
     }
     const item = await Category.findByIdAndUpdate(
       categoryId,
@@ -126,17 +100,13 @@ const updateCategory = asynchandler(async (req, res) => {
       { new: true }
     );
     if (!item) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Category is not found..." });
+      return next(new AppError("Category is not found...", 400));
     }
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Update a category with success...", {
       item,
-      message: "Update a category with success...",
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 });
 module.exports = {

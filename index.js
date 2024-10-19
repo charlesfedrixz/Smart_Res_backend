@@ -16,13 +16,13 @@ const { foodRoutes } = require("./routes/foodRoute");
 const { customerRoutes } = require("./routes/customerRoute");
 const orderRoutes = require("./routes/orderRoutes");
 const payments = require("./routes/paymentRoute");
-const errorHandle = require("./controller/errorHandle");
 const { categoryRoutes } = require("./routes/categoryRoute");
 const {
   updateOrderBySocket,
   updateOrderPaymentBySocket,
 } = require("./controller/orderController");
 const invoiceRoute = require("./routes/invoiceRoute");
+const sendResponse = require("./middleware/sendResponse");
 
 app.use(express.json());
 app.use(
@@ -45,7 +45,6 @@ app.use((req, res, next) => {
 app.use(express.static("uploads"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
-app.use(errorHandle);
 connectDB();
 
 app.use("/api/admin", adminRoutes);
@@ -114,11 +113,14 @@ io.on("connection", (socket) => {
   });
 });
 
-app.get("/", (res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server of your Smart Restaurant is running...",
-  });
+app.get("/", (req, res) => {
+  return sendResponse(
+    res,
+    true,
+    200,
+    "Server of your Smart Restaurant is running...",
+    {}
+  );
 });
 
 app.set("port", 4000);

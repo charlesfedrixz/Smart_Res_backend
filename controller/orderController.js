@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const Order = require("../models/orderModels"); // Adjust the path as necessary
 const jwt = require("jsonwebtoken");
 const Food = require("../models/foodModels");
+const sendResponse = require("../middleware/sendResponse");
+const AppError = require("../middleware/errorHandler");
 
 function getUserData(headers) {
   const authHeader = headers?.authorization;
@@ -55,15 +57,15 @@ function getAdminData(headers) {
   };
 }
 
-const createOrder = async (req, res) => {
+const createOrder = async (req, res, next) => {
   try {
     const { foodItems } = req.body;
     const userData = getUserData(req.headers);
     if (!userData?.customerId) {
-      return res.status(403).json({ msg: "User Expired Please log in again" });
+      return next(new AppError("User Expired Please log in again", 403));
     }
     if (!foodItems) {
-      return res.status(400).json({ msg: "No food ordered..." });
+      return next(new AppError("No food ordered...", 400));
     }
     const order = new Order({
       customerId: userData?.customerId,
@@ -72,60 +74,38 @@ const createOrder = async (req, res) => {
         quantity: item.quantity,
       })),
     });
-
     // Calculate the total amount
     const response = await order.calculateTotalAmount();
-
     if (!response.success) {
-      return res.status(400).json({ msg: response.message, success: false });
+      return next(new AppError(response.message, 400));
     }
-    //  order.isRated = true;
-    // Save the order
     await order.save();
     console.log(order);
-    return res
-      .status(200)
-      .json({ msg: "Order created successfully", order, success: true });
+    return sendResponse(res, true, 200, "Order created successfully", {
+      order,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Error creating order", error });
+    return next(new AppError("Error creating order", 500));
   }
 };
 
 const deleteOrder = async (req, res, next) => {
   const { orderId } = req.body;
-
+  if (orderId) return next(new AppError("Please order ID", 400));
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid order ID." });
+    return next(new AppError("Invalid order ID.", 400));
   }
-
   try {
     const order = await Order.findById(orderId);
-
     if (!order) {
       return res
         .status(200)
         .json({ success: true, message: "Order not found." });
     }
-
     await Order.deleteOne({ _id: orderId });
-
-    return res
-      .status(200)
-      .json({ success: true, message: "Order deleted successfully." });
+    return sendResponse(res, true, 200, "Order deleted successfully.");
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error deleting order",
-      error: error.message,
-    });
-  }
-
-  if (next) {
-    next();
+    return next(new AppError("Error deleting order", 500));
   }
 };
 
@@ -137,75 +117,56 @@ const deleteFood = async (req, res, next) => {
     !mongoose.Types.ObjectId.isValid(orderId) ||
     !mongoose.Types.ObjectId.isValid(foodId)
   ) {
-    return res.status(400).json({ msg: "Invalid order ID or food ID." });
+    return next(new AppError("Invalid order ID or food ID.", 400));
   }
-
   try {
     const order = await Order.findById(orderId);
     if (!order) {
-      return res.status(404).json({ msg: "Order not found." });
+      return next(new AppError("Order not found.", 404));
     }
-
     // Find the index of the food item in the foodItems array
     const foodIndex = order.foodItems.findIndex(
       (item) => item.foodId.toString() === foodId
     );
     if (foodIndex === -1) {
-      return res.status(404).json({ msg: "Food not found in order." });
+      return next(new AppError("Food not found in order.", 404));
     }
-
-    // Remove the food item from the array
     order.foodItems.splice(foodIndex, 1);
-
-    // Save the updated order
     await order.save();
-
-    res.status(200).json({ order, msg: "Food deleted successfully." });
+    return sendResponse(res, true, 200, "Food deleted successfully.", {
+      order,
+    });
   } catch (error) {
-    res.status(500).json({ msg: "Error deleting food", error: error.message });
-  }
-  if (next) {
-    next();
+    return next(new AppError("Error deleting food", 500));
   }
 };
 
 const tableOrder = async (req, res, next) => {
   const { orderId } = req.body;
+  if (orderId) return next(new AppError("Please provide OrderId", 400));
 
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
-    return res.status(400).json({ msg: "Invalid  ID." });
+    return next(new AppError("Invalid  ID.", 400));
   }
-
   try {
     const order = await Order.findById(orderId);
-
     if (!order) {
-      return res.status(404).json({ msg: "Order not found in the table." });
+      return next(new AppError("Order not found in the table.", 404));
     }
-
-    res.status(200).json({ order, msg: "table order listed successfully." });
+    return sendResponse(res, true, 200, "table order listed successfully.", {
+      order,
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({ msg: "Error list table order", error: error.message });
-  }
-
-  if (next) {
-    next();
+    return next(new AppError("Error list table order", 500));
   }
 };
 
 //admin order list
-const adminOrderList = async (req, res) => {
-  console.log("object");
+const adminOrderList = async (req, res, next) => {
   try {
-    // console.log("object");
     const { userId } = getAdminData(req.headers);
-    console.log(userId);
     if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide token" });
+      return next(new AppError("Please provide token", 400));
     }
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
@@ -221,13 +182,11 @@ const adminOrderList = async (req, res) => {
       .exec()
       .populate("customerId")
       .populate("foodItems.foodId");
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Customer Order listed with success ", {
       orderList,
-      message: "Customer Order listed with success ",
     });
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return next(new AppError("Server Error", 500));
   }
 };
 const listOrders = async (req, res, next) => {
@@ -251,32 +210,19 @@ const listOrders = async (req, res, next) => {
         .status(200)
         .json({ success: true, message: "No orders found." });
     }
-    return res
-      .status(200)
-      .json({ orders, success: true, message: "Order listed successfully" });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching orders",
-      error: error.message,
+    return sendResponse(res, true, 200, "Order listed successfully", {
+      orders,
     });
-  }
-
-  if (next) {
-    next();
+  } catch (error) {
+    return next(new AppError("Error fetching orders", 500));
   }
 };
 //
-const customerOrderlist = async (req, res) => {
+const customerOrderlist = async (req, res, next) => {
   try {
     const { customerId } = getUserData(req.headers);
     if (!customerId)
-      return res
-        .status(403)
-        .json({ success: false, message: "User Expired Please log in again" });
-    // console.log("Customer ID:", customerId);
-
-    // Retrieve orders for the customer and populate food details
+      return next(new AppError("User Expired Please log in again", 403));
     const orders = await Order.find({ customerId })
       .populate("foodItems.foodId")
       .exec();
@@ -315,19 +261,12 @@ const customerOrderlist = async (req, res) => {
         })),
       };
     });
-
-    console.log("details:", ordersWithFoodDetails);
-    // Respond with the order and food details
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Customer order listed successfully", {
       orders: ordersWithFoodDetails,
-      message: "Customer order listed successfully",
     });
   } catch (error) {
     console.error("Error fetching orders:", error);
-    return res
-      .status(500)
-      .json({ msg: "Error fetching orders", error: error.message });
+    return next(new AppError("Error fetching orders", 500));
   }
 };
 
@@ -401,105 +340,83 @@ const updateOrderPaymentBySocket = async (orderId, paid, socket) => {
   }
 };
 
-const updateOrderStatus = async (req, res) => {
+const updateOrderStatus = async (req, res, next) => {
   try {
     const { orderId, newStatus } = req.body;
     if (!orderId || !newStatus) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide OrderId and New status...",
-      });
+      return next(
+        new AppError("Please provide OrderId and New status...", 400)
+      );
     }
     const order = await Order.findById(orderId.trim());
     if (!order) {
       console.error(`Order with ID ${orderId} not found.`);
-      return res
-        .status(400)
-        .json({ success: false, message: "Order is not found.." });
+      return next(new AppError("Order is not found..", 400));
     }
     if (order.status == newStatus) {
-      return res.status(400).json({
-        success: false,
-        message: "Order Status is already up-to-date",
-      });
+      return next(new AppError("Order Status is already up-to-date", 200));
     }
     await order.updateStatusOrder(newStatus);
-    return res.status(200).json({
-      success: true,
-      message: `Order status updated to: ${newStatus}`,
-    });
+    return sendResponse(
+      res,
+      true,
+      200,
+      `Order status updated to: ${newStatus}`
+    );
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: `Error updating order status: ${error.message}`,
-    });
+    return next(
+      new AppError(`Error updating order status: ${error.message}`, 400)
+    );
   }
 };
 
-const updateOrderPayment = async (req, res) => {
+const updateOrderPayment = async (req, res, next) => {
   try {
     const { orderId, newPayment } = req.body;
-    console.log(orderId, newPayment);
     if (!orderId || !newPayment) {
-      return res.status(400).json({
-        success: false,
-        message: "Provide order id and new payment...",
-      });
+      return next(new AppError("Provide order id and new payment...", 400));
     }
     const order = await Order.findById(orderId.trim());
-    console.log(order);
     if (!order) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Order is not found..." });
+      return next(new AppError("Order is not found...", 400));
     }
-    console.log("object");
     await order.updateStatusPayment(newPayment);
-    return res.status(200).json({
-      success: true,
-      message: "Payment status is update with success...",
-    });
+    return sendResponse(
+      res,
+      true,
+      200,
+      "Payment status is update with success..."
+    );
   } catch (error) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Server Error for ..." });
+    return next(new AppError("Server Error ", 500));
   }
 };
-const updateFoodItemStatus = async (req, res) => {
+const updateFoodItemStatus = async (req, res, next) => {
   try {
     const { orderId, foodId, newStatus } = req.body;
     const order = await Order.findById(orderId.trim());
 
     if (!order) {
-      return res
-        .status(404)
-        .json({ msg: `Order with ID ${orderId} not found.` });
+      return next(new AppError(`Order with ID ${orderId} not found.`, 404));
     }
     const foodItem = order.foodItems.find(
       (item) => item.foodId.toString() === foodId
     );
     if (!foodItem) {
-      return res.status(404).json({
-        success: false,
-        message: `Food item with ID ${foodItem} not found in order.`,
-      });
+      return next(
+        new AppError(`Food item with ID ${foodItem} not found in order.`, 404)
+      );
     }
     if (foodItem.status == newStatus) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Food Status is already up-to-date" });
+      return next(new AppError("Food Status is already up-to-date", 400));
     }
     foodItem.status = newStatus;
     await order.save();
-    return res.status(200).json({
-      success: true,
-      message: "Food status is updated... ",
-    });
+    return sendResponse(res, true, 200, "Food status is updated... ");
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: `Error updating food item status: ${error.message}`,
-    });
+    return next(
+      new AppError(`Error updating food item status: ${error.message}`, 500)
+    );
   }
 };
 
@@ -516,28 +433,20 @@ const getItemPriceById = async (foodId) => {
     throw error;
   }
 };
-const addOrder = async (req, res) => {
+const addOrder = async (req, res, next) => {
   try {
     const { orderId, foodItems } = req.body;
-    console.log("orderId:", orderId);
-    console.log("foodItem:", foodItems);
     const customer = getUserData(req.headers);
     if (!customer)
-      return res
-        .status(403)
-        .json({ success: false, message: "User Expired Please log in again" });
+      return next(new AppError("User Expired Please log in again", 403));
 
     if (!foodItems || !orderId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "provide food item  and orderid..." });
+      return next(new AppError("provide food item  and orderid...", 400));
     }
 
     const order = await Order.findById(orderId).populate("foodItems.foodId");
     if (!order) {
-      return res
-        .status(400)
-        .json({ success: false, message: " Order is not found..." });
+      return next(new AppError(" Order is not found...", 400));
     }
 
     foodItems.forEach((item) => {
@@ -559,13 +468,20 @@ const addOrder = async (req, res) => {
         try {
           const itemPrice = await getItemPriceById(item.id);
           if (!itemPrice) {
-            throw new Error(`Food item price not found for ID: ${item.foodId}`);
+            return next(
+              new AppError(
+                `Food item price not found for ID: ${item.foodId}`,
+                400
+              )
+            );
           }
           console.log("Item Price for", item.id, ":", itemPrice);
           return item.quantity * itemPrice;
         } catch (error) {
           console.error(`Error fetching price for item ID: ${item.id}`, error);
-          throw error;
+          return next(
+            new AppError(`Error fetching price for item ID: ${item.id}`, 500)
+          );
         }
       })
     );
@@ -577,18 +493,16 @@ const addOrder = async (req, res) => {
       (order.newItemsTotalAmount || 0) + newItemsTotalAmount;
     await order.save();
 
-    return res
-      .status(200)
-      .json({ message: "AddOrder update successfully", order, success: true });
+    return sendResponse(res, true, 200, "AddOrder update successfully", {
+      order,
+    });
   } catch (error) {
     console.error("Error adding new order:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Error adding new order", error });
+    return next(new AppError("Error adding new order", 500));
   }
 };
 
-const yesterdayOrder = async (req, res) => {
+const yesterdayOrder = async (req, res, next) => {
   try {
     const startOfYesterday = new Date();
     startOfYesterday.setTime(startOfYesterday.getDate() - 1);
@@ -605,26 +519,24 @@ const yesterdayOrder = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .exec();
-    return res.status(200).json({
-      success: true,
-      historyOrder,
-      message: "List the order of yesterday with success",
-    });
+    return sendResponse(
+      res,
+      true,
+      200,
+      "List the order of yesterday with success",
+      { historyOrder }
+    );
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: true, message: error });
+    return next(new AppError("Error list of yesterday order", 500));
   }
 };
 
-const customerlistOrder = async (req, res) => {
+const customerlistOrder = async (req, res, next) => {
   try {
     const { customerId } = getUserData(req.headers);
     if (!customerId)
-      return res
-        .status(403)
-        .json({ success: false, message: "User Expired Please log in again" });
-
-    // Retrieve orders for the customer and populate food details
+      return next(new AppError("User Expired Please log in again", 403));
     const orders = await Order.find({ customerId })
       .populate("foodItems.foodId")
       .exec();
@@ -649,16 +561,52 @@ const customerlistOrder = async (req, res) => {
         allFooditems,
       };
     });
-    return res.status(200).json({
-      success: true,
+    return sendResponse(res, true, 200, "Customer order listed successfully", {
       orders: ordersWithFoodDetails,
-      message: "Customer order listed successfully",
     });
   } catch (error) {
     console.error("Error fetching orders:", error);
-    return res
-      .status(500)
-      .json({ msg: "Error fetching orders", error: error.message });
+    return next(new AppError("Error fetching orders", 500));
+  }
+};
+
+const dailyOrder = async (req, res) => {
+  try {
+    const { userId } = getUserData(req.headers);
+    if (!userId) return next(new AppError("Token Expired or Invalid", 400));
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(24, 59, 59, 999);
+
+    const todayOrders = await Order.find({
+      createdAt: { $gte: startOfToday, $lt: endOfToday },
+    });
+    if (!todayOrders.length) {
+      return sendResponse(res, true, 200, "No order found for today", {
+        totalOrders: 0,
+        totalAmount: 0,
+      });
+    }
+    totalOrders = todayOrders.length;
+    totalAmount = todayOrders.reduce(
+      (acc, order) => acc + order.totalAmount,
+      0
+    );
+    return sendResponse(
+      res,
+      true,
+      200,
+      "Today's orders retrieved successfully",
+      {
+        totalOrders,
+        totalAmount,
+        orders: todayOrders,
+      }
+    );
+  } catch (error) {
+    return next(new AppError("Error fetching today's orders", 500));
   }
 };
 module.exports = {
@@ -679,4 +627,5 @@ module.exports = {
   yesterdayOrder: yesterdayOrder,
   addOrder: addOrder,
   customerlistOrder: customerlistOrder,
+  dailyOrder: dailyOrder,
 };

@@ -13,6 +13,7 @@ const {
   adminOrderList,
   yesterdayOrder,
   customerlistOrder,
+  dailyOrder,
 } = require("../controller/orderController"); // Ensure correct path
 
 const order = express.Router();
@@ -30,6 +31,7 @@ order.get("/adminOrderList", adminOrderList);
 order.get("/yesterdayOrderList", yesterdayOrder);
 order.post("/addOrder", addOrder);
 order.post("/newlist", customerlistOrder);
+order.get("/today", dailyOrder);
 
 module.exports = {
   order: order,
