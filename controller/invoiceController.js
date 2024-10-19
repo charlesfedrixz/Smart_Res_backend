@@ -1,22 +1,26 @@
 const Invoice = require("../models/invoicemodel");
-const sendResponse = require("../middleware/sendResponse");
-const AppError = require("../middleware/errorHandler");
 const fetchInvoice = async (req, res, next) => {
   const { invoiceId } = req.body;
   if (!invoiceId) {
-    return next(new AppError("please provide the invoiceId", 400));
+    return res
+      .status(400)
+      .json({ success: false, message: "please provide the invoiceId" });
   }
   try {
     const findInvoice = await Invoice.findById(invoiceId).populate("orderId");
     if (!findInvoice) {
-      return next(new AppError("There is no invoice", 400));
+      return res
+        .status(400)
+        .json({ success: false, message: "There is no invoice" });
     }
-    return sendResponse(res, true, 200, "Invoice for Order", {
+    return res.status(200).json({
+      success: true,
       invoice: findInvoice,
+      message: "Invoice for Order",
     });
   } catch (error) {
     console.error("Error in fetching the invoice", error);
-    return next(new AppError("Server Error", 500));
+    return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 

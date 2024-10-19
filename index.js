@@ -22,7 +22,6 @@ const {
   updateOrderPaymentBySocket,
 } = require("./controller/orderController");
 const invoiceRoute = require("./routes/invoiceRoute");
-const sendResponse = require("./middleware/sendResponse");
 
 app.use(express.json());
 app.use(
@@ -114,13 +113,10 @@ io.on("connection", (socket) => {
 });
 
 app.get("/", (req, res) => {
-  return sendResponse(
-    res,
-    true,
-    200,
-    "Server of your Smart Restaurant is running...",
-    {}
-  );
+  return res.status(200).json({
+    success: true,
+    message: "Server of your Smart Restaurant is running...",
+  });
 });
 
 app.set("port", 4000);

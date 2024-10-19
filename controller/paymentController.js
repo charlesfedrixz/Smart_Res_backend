@@ -3,10 +3,8 @@ const Razorpay = require("razorpay");
 const Order = require("../models/orderModels");
 const crypto = require("crypto");
 const { Invoice } = require("../models/invoicemodel");
-const sendResponse = require("../middleware/sendResponse");
-const AppError = require("../middleware/sendResponse");
 
-const payment = async (req, res, next) => {
+const payment = async (req, res) => {
   try {
     // Initialize Razorpay instance with your credentials
     const razorpay = new Razorpay({
@@ -16,10 +14,15 @@ const payment = async (req, res, next) => {
 
     // const options = req.body;
     const { orderId } = req.body;
-    if (!orderId) return next(new AppError("Please provide orderId", 400));
-
+    if (!orderId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide orderId" });
     const currentOrder = await Order.findById(orderId);
-    if (!currentOrder) return next(new AppError("Order Not Found", 400));
+    if (!currentOrder)
+      return res
+        .status(400)
+        .json({ success: false, message: "Order Not Found" });
 
     // Create Invoice
     const invoice = await Invoice.create({
@@ -40,16 +43,19 @@ const payment = async (req, res, next) => {
 
     if (!order) {
       if (!order)
-        return next(new AppError("Error: Order creation failed", 500));
+        return res
+          .status(500)
+          .json({ success: false, message: "Error: Order creation failed" });
     }
-    return sendResponse(res, true, 200, "payment created successfully", {
-      order,
-    });
+    return res
+      .status(200)
+      .json({ success: true, order, message: "payment created successfully" });
   } catch (error) {
     console.error("Error creating order:", error);
-    return next(
-      new AppError("An error occurred while creating the order", 500)
-    );
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while creating the order",
+    });
   }
 };
 
@@ -62,7 +68,9 @@ const paymentVerify = async (req, res, next) => {
       razorpay_signature,
     } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return next(new AppError("Missing required fields", 400));
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
     }
     const sign = razorpay_order_id + "|" + razorpay_payment_id;
 
@@ -74,20 +82,30 @@ const paymentVerify = async (req, res, next) => {
       // find the invoice
       const currentInvoice = await Invoice.findById(razorpayOrder.receipt);
 
-      if (!currentInvoice) return next(new AppError("Invoice not found", 400));
+      if (!currentInvoice)
+        return res
+          .status(400)
+          .json({ success: false, message: "Invoice not found" });
       await currentInvoice.updateStatus("Paid");
       const currentOrder = await Order.findById(currentInvoice.orderId);
-      if (!currentOrder) return next(new AppError("order not found", 400));
+      if (!currentOrder)
+        return res
+          .status(400)
+          .json({ success: false, message: "order not found" });
       await currentOrder.updateStatusPayment(true);
       await currentOrder.updatePaymentMode("Online");
-      return sendResponse(res, true, 200, "payment verified successfully");
+      return res
+        .status(200)
+        .json({ success: true, message: "payment verified successfully" });
     } else {
       await Invoice.updateStatus("Processing");
       await Order.updatePaymentStatus(false);
-      return next(new AppError("Invalid signature sent", 400));
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid signature sent" });
     }
   } catch (error) {
-    return next(new AppError("Server Error", 500));
+    return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
@@ -103,7 +121,10 @@ const paymentNew = async (req, res, next) => {
     const { orderId } = req.body;
 
     const currentOrder = await Order.findById(orderId);
-    if (!currentOrder) return next(new AppError("Order Not Found", 400));
+    if (!currentOrder)
+      return res
+        .status(400)
+        .json({ success: false, message: "Order Not Found" });
     if (
       currentOrder.payment_mode === "offline" ||
       currentOrder.payment_mode === "Cash"
@@ -115,33 +136,38 @@ const paymentNew = async (req, res, next) => {
         orderId,
       });
       await invoice.updateStatus("Pending");
-      return sendResponse(
-        res,
-        true,
-        200,
-        "Offline Payment created with invoice successfull  ",
-        { Data: invoice }
-      );
+      return res.status(200).json({
+        success: true,
+        Data: invoice,
+        message: "Offline Payment created with invoice successfull  ",
+      });
     } else {
-      return next(new AppError("Invalid payment mode ", 400));
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payment mode " });
     }
   } catch (error) {
     console.error("Error creating order:", error);
-    return next(
-      new AppError("An error occurred while creating the order", 500)
-    );
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while creating the order",
+    });
   }
 };
 
 const cashPayment = async (req, res, next) => {
   const { orderId } = req.body;
   if (!orderId) {
-    return next(new AppError("Please provide orderId field", 400));
+    return res
+      .status(400)
+      .json({ success: false, message: "Please provide orderId field" });
   }
   try {
     const findOrder = await Order.findById(orderId);
     if (!findOrder) {
-      return next(new AppError("Order is not found", 400));
+      return res
+        .status(400)
+        .json({ success: false, message: "Order is not found" });
     }
     const invoice = await Invoice.create({
       amount: findOrder.totalAmount,
@@ -149,18 +175,15 @@ const cashPayment = async (req, res, next) => {
       orderId,
     });
     await invoice.updateStatus("Pending");
-    return sendResponse(
-      res,
-      true,
-      200,
-      "Offline Payment created with invoice successfull  ",
-      { Data: invoice }
-    );
+    return res
+      .status(200)
+      .json({ success: true, Data: invoice, message: "Server Error" });
   } catch (error) {
     console.error("Error creating order:", error);
-    return next(
-      new AppError("An error occurred while creating invoice  order", 500)
-    );
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while creating invoice  order",
+    });
   }
 };
 module.exports = {
