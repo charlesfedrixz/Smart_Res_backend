@@ -179,7 +179,7 @@ const verifiedEmailOTP = asyncHandler(async (req, res) => {
   }
 });
 //reset password
-const resetPassword = asyncHandler(async (req, res, next) => {
+const resetPassword = asyncHandler(async (req, res) => {
   const { userId } = getUserData(req.headers);
   if (!userId) {
     return res
@@ -217,9 +217,10 @@ const resetPassword = asyncHandler(async (req, res, next) => {
 });
 
 //logout
-const logout = asyncHandler(async (req, res, next) => {
+const logout = asyncHandler(async (req, res) => {
   try {
     const { success, message, userId } = getUserData(req.headers);
+
     if (!success) {
       const statusCode = message === "Token has expired " ? 401 : 400;
       return res.status(statusCode).json({ success: false, message });

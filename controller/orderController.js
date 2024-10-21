@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Order = require("../models/orderModels"); // Adjust the path as necessary
 const jwt = require("jsonwebtoken");
 const Food = require("../models/foodModels");
+const Category = require("../models/categoryModels");
 function getUserData(headers) {
   const authHeader = headers?.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -650,11 +651,15 @@ const dailyOrder = async (req, res) => {
     const todayOrders = await Order.find({
       createdAt: { $gte: startOfToday, $lt: endOfToday },
     });
+    const totalFoodItems = await Food.countDocuments();
+    const totalCategories = await Category.countDocuments();
     if (!todayOrders.length) {
       return res.status(200).json({
         success: true,
         totalOrders: 0,
         totalAmount: 0,
+        totalFoodItems,
+        totalCategories,
         message: "No order found for today",
       });
     }
@@ -667,6 +672,8 @@ const dailyOrder = async (req, res) => {
       success: true,
       totalOrders,
       totalAmount,
+      totalFoodItems,
+      totalCategories,
       orders: todayOrders,
       message: "Today's orders retrieved successfully",
     });

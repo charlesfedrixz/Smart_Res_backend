@@ -1,7 +1,17 @@
 const jwt = require("jsonwebtoken");
 
 const getUserData = (headers) => {
+  // Check if the authorization header exists
+  if (!headers || !headers.authorization) {
+    return {
+      success: false,
+      message: "Authorization header missing",
+      userId: null,
+      token: null,
+    };
+  }
   const token = headers?.authorization?.split(" ")[1];
+
   if (!token) {
     return {
       success: false,
