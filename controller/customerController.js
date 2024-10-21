@@ -85,6 +85,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
 const OtpVerify = async (req, res) => {
   try {
     const { mobileNumber, otp } = req.body;
+
     if (!mobileNumber || !otp) {
       return res
         .status(400)
@@ -138,49 +139,73 @@ const Register = asyncHandler(async (req, res) => {
         .json({ success: false, message: "Please provide a Mobile Number" });
     }
     const customerFind = await customer.findOne({ mobileNumber });
-    if (customerFind && customerFind.currentTableNumber != currentTableNumber) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Table's occupied by another customer try a new table",
-        });
-    } else if (
+    if (
       customerFind &&
-      customerFind.currentTableNumber == currentTableNumber
+      customerFind.currentTableNumber != currentTableNumber &&
+      customerFind.isVerified
+    ) {
+      return res.status(400).json({
+        success: false,
+        token: null,
+        message: "Table's occupied by another customer try a new table",
+      });
+    }
+    if (customerFind && !customerFind.isVerified) {
+      const otp = generateOTP();
+      customerFind.otp = otp;
+      customerFind.otpExpire = Date.now() + 1000 * 60 * 5; // Reset OTP expiry time
+      await customerFind.save();
+
+      //send otp function
+      await sendOTPSMS(mobileNumber, otp);
+      console.log("OTP resent to unverified customer");
+
+      return res.status(200).json({
+        success: true,
+        token: null,
+        message: "OTP is sent again for unverified customer",
+      });
+    }
+    if (
+      customerFind &&
+      customerFind.currentTableNumber == currentTableNumber &&
+      customerFind.isVerified
     ) {
       const otp = generateOTP();
       customerFind.currentTableNumber = currentTableNumber;
       customerFind.otp = otp;
+      customerFind.otpExpire = Date.now() + 1000 * 60 * 5;
       await customerFind.save();
       //send otp function
       await sendOTPSMS(mobileNumber, otp);
-      return res
-        .status(200)
-        .json({
-          success: true,
-          token: null,
-          message:
-            "OTP pppp is send and register with success for existing user ",
-        });
+      console.log("existing number");
+      return res.status(200).json({
+        success: true,
+        token: null,
+        message: "OTP is send and register with success for existing user ",
+      });
     }
 
-    const otp = generateOTP();
-    const newCustomer = await customer.create({
-      mobileNumber: mobileNumber,
-      currentTableNumber: currentTableNumber,
-      otp: otp,
-      otpExpire: Date.now() + 1000 * 60 * 5,
-    });
-    //send otp function
-    await sendOTPSMS(mobileNumber, otp);
-    return res
-      .status(200)
-      .json({
+    if (!customerFind) {
+      const otp = generateOTP();
+      const newCustomer = await customer.create({
+        mobileNumber: mobileNumber,
+        currentTableNumber: currentTableNumber,
+        otp: otp,
+        otpExpire: Date.now() + 1000 * 60 * 5,
+      });
+
+      //send otp function
+      await sendOTPSMS(mobileNumber, otp);
+      console.log("new number");
+
+      return res.status(200).json({
         success: true,
-        Data: newCustomer,
+        Data: newCustomer.mobileNumber,
+        token: null,
         message: "Register a new customer and OTP is send with success",
       });
+    }
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: true, message: "Server Error" });
