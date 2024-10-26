@@ -17,12 +17,14 @@ function getUserData(headers) {
   }
   try {
     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verifiedToken || !verifiedToken.user)
+    if (!verifiedToken || !verifiedToken.id) {
+      //user to id
       return {
         customerId: null,
       };
+    }
     return {
-      customerId: verifiedToken.user.id,
+      customerId: verifiedToken.id, //user.id to id
     };
   } catch (error) {
     console.error("JWT verification error:", error.message);
@@ -565,6 +567,11 @@ const addOrder = async (req, res) => {
 
 const yesterdayOrder = async (req, res) => {
   try {
+    const { customerId } = getUserData(req.headers);
+    if (!customerId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Token Expired or Invalid" });
     const startOfYesterday = new Date();
     startOfYesterday.setTime(startOfYesterday.getDate() - 1);
     startOfYesterday.setHours(0, 0, 0, 0);
@@ -572,7 +579,7 @@ const yesterdayOrder = async (req, res) => {
     const endOfYesterday = new Date();
     endOfYesterday.setTime(endOfYesterday.getDate() - 1);
     endOfYesterday.setHours(23, 59, 59, 999);
-    const historyOrder = await Order.find({
+    const yesterdayOrder = await Order.find({
       createdAt: {
         $gte: startOfYesterday,
         $lt: endOfYesterday,
@@ -580,9 +587,31 @@ const yesterdayOrder = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .exec();
+
+    const totalFoodItems = await Food.countDocuments();
+    const totalCategories = await Category.countDocuments();
+    totalOrders = yesterdayOrder.length;
+    totalAmount = yesterdayOrder.reduce(
+      (acc, order) => acc + order.totalAmount,
+      0
+    );
+    if (!yesterdayOrder.length) {
+      return res.status(200).json({
+        success: true,
+        totalOrders: 0,
+        totalAmount: 0,
+        totalFoodItems,
+        totalCategories,
+        message: "No order for yesterday.",
+      });
+    }
     return res.status(200).json({
       success: true,
-      historyOrder,
+      Order: yesterdayOrder,
+      totalOrders,
+      totalAmount,
+      totalFoodItems,
+      totalCategories,
       message: "List the order of yesterday with success",
     });
   } catch (error) {
@@ -637,8 +666,8 @@ const customerlistOrder = async (req, res) => {
 
 const dailyOrder = async (req, res) => {
   try {
-    const { userId } = getUserData(req.headers);
-    if (!userId)
+    const { customerId } = getUserData(req.headers);
+    if (!customerId)
       return res
         .status(400)
         .json({ success: false, message: "Token Expired or Invalid" });
@@ -683,6 +712,66 @@ const dailyOrder = async (req, res) => {
       .json({ success: false, message: "Error fetching today's orders" });
   }
 };
+
+const modifiedOrder = async (req, res) => {
+  try {
+    const { customerId } = getUserData(req.headers);
+    if (!customerId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Token Expired or Invalid" });
+    const recentModified = await Order.find().sort({ updatedAt: -1 }).limit(1);
+    if (!recentModified) {
+      return res
+        .status(400)
+        .json({ success: true, message: "No Order is modified" });
+    }
+    return res.status(200).json({
+      success: true,
+      recentModified: recentModified.updatedAt,
+      message: "Recent Order modified retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error in finding modified order", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error in getting the modified order" });
+  }
+};
+
+const todayDeleteOrder = async (req, res) => {
+  try {
+    const { customerId } = getUserData(req.headers);
+    if (!customerId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Token Expired or Invalid" });
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endsOfToday = new Date();
+    endsOfToday.setHours(23, 59, 59, 999);
+
+    const todayDelete = await Order.deleteMany({
+      createdAt: { $gte: startOfToday, $lt: endsOfToday },
+    });
+    if (todayDelete.deletedCount === 0) {
+      return res
+        .status(200)
+        .json({ success: true, message: "No order found for today" });
+    }
+    return res
+      .status(200)
+      .json({
+        success: true,
+        todayDelete,
+        messagge: `Successfully deleted ${todayDelete.deletedCount} orders for today`,
+      });
+  } catch (error) {
+    console.error("Error in getting today deeleted order");
+  }
+};
 module.exports = {
   createOrder: createOrder,
   deleteOrder: deleteOrder,
@@ -702,4 +791,6 @@ module.exports = {
   addOrder: addOrder,
   customerlistOrder: customerlistOrder,
   dailyOrder: dailyOrder,
+  modifiedOrder: modifiedOrder,
+  todayDeleteOrder: todayDeleteOrder,
 };
