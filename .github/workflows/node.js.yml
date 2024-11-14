@@ -33,5 +33,5 @@ jobs:
         run: |
           echo "${{ secrets.PROD_ENV_FILE }}" > .env
 
-      - name: Restart application using PM2
-        run: pm2 restart smart-restaurant
+      # - name: Restart application using PM2
+      #   run: pm2 restart smart-restaurant
