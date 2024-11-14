@@ -1,20 +1,16 @@
-# FROM node:slim
-# WORKDIR /
-# COPY . /
-# RUN npm install
-# EXPOSE 4000
-# CMD node index.js
-
 FROM node:slim
 
 # Create a directory inside the container for the app
 WORKDIR /app
 
-# Copy package.json and package-lock.json first (for caching dependencies)
+# Copy the package.json and package-lock.json files first
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install
+
+# Copy the .env file
+COPY .env .env
 
 # Copy the rest of the application files
 COPY . .
