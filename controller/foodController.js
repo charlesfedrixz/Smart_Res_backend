@@ -265,25 +265,58 @@ const getFoodByCategory = async (req, res) => {
   }
 };
 //search food
-const searchFood = async (req, res, next) => {
+// const searchFood = async (req, res) => {
+//   try {
+//     const { foodName } = req.params;
+//     console.log("foodName:", foodName);
+//     const food = await Food.find({ name: { $regex: foodName, $options: "i" } });
+//     console.log("food:", food);
+//     if (!foodName) {
+//       return res
+//         .status(200)
+//         .json({ success: true, food, messagae: "Provide a food name" });
+//     }
+//     // if (!food || food.length === 0) {
+//     //   return res
+//     //     .status(200)
+//     //     .json({ success: true, food: [], messagae: "Food is not found" });
+//     // }
+//     return res
+//       .status(200)
+//       .json({ success: true, food, messagae: "Food is here..." });
+//   } catch (error) {
+//     return res.status(500).json({ success: false, messagae: "Server Error" });
+//   }
+// };
+
+const searchFood = async (req, res) => {
   try {
     const { foodName } = req.query;
-    const food = await Food.find({ name: { $regex: foodName, $options: "i" } });
+
+    // Check if foodName is provided
     if (!foodName) {
       return res
-        .status(200)
-        .json({ success: true, food, messagae: "Provide a food name" });
+        .status(400)
+        .json({ success: false, food: [], message: "Provide a food name" });
     }
-    if (!food || food.length === 0) {
+
+    // Perform the search using regex for case-insensitive match
+    const food = await Food.find({ name: { $regex: foodName, $options: "i" } });
+
+    // If food array is empty, return food not found message
+    if (food.length === 0) {
       return res
-        .status(200)
-        .json({ success: true, food, messagae: "Food is not found" });
+        .status(404)
+        .json({ success: false, food: [], message: "Food is not found" });
     }
+
+    // Return the found food items
     return res
       .status(200)
-      .json({ success: true, food, messagae: "Food is here..." });
+      .json({ success: true, food, message: "Food is here..." });
   } catch (error) {
-    return res.status(500).json({ success: false, messagae: "Server Error" });
+    console.error("Server Error:", error);
+    return res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 

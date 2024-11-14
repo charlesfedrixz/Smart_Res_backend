@@ -2,7 +2,7 @@ require("dotenv").config();
 const Razorpay = require("razorpay");
 const Order = require("../models/orderModels");
 const crypto = require("crypto");
-const { Invoice } = require("../models/invoicemodel");
+const Invoice = require("../models/invoicemodel");
 
 const payment = async (req, res) => {
   try {
@@ -24,6 +24,8 @@ const payment = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Order Not Found" });
 
+    //update payment mode
+    await currentOrder.updatePaymentMode("online");
     // Create Invoice
     const invoice = await Invoice.create({
       amount: currentOrder.totalAmount,
@@ -49,7 +51,11 @@ const payment = async (req, res) => {
     }
     return res
       .status(200)
-      .json({ success: true, order, message: "payment created successfully" });
+      .json({
+        success: true,
+        order,
+        message: "Online payment created  with invoice successfully",
+      });
   } catch (error) {
     console.error("Error creating order:", error);
     return res.status(500).json({
@@ -59,7 +65,7 @@ const payment = async (req, res) => {
   }
 };
 
-const paymentVerify = async (req, res, next) => {
+const paymentVerify = async (req, res) => {
   try {
     const {
       razorpayOrder,
@@ -109,7 +115,7 @@ const paymentVerify = async (req, res, next) => {
   }
 };
 
-const paymentNew = async (req, res, next) => {
+const paymentNew = async (req, res) => {
   try {
     // Initialize Razorpay instance with your credentials
     const razorpay = new Razorpay({
@@ -141,6 +147,7 @@ const paymentNew = async (req, res, next) => {
         Data: invoice,
         message: "Offline Payment created with invoice successfull  ",
       });
+    } else if (currentOrder.payment_mode === "Cash") {
     } else {
       return res
         .status(400)
@@ -155,7 +162,7 @@ const paymentNew = async (req, res, next) => {
   }
 };
 
-const cashPayment = async (req, res, next) => {
+const cashPayment = async (req, res) => {
   const { orderId } = req.body;
   if (!orderId) {
     return res
@@ -169,15 +176,22 @@ const cashPayment = async (req, res, next) => {
         .status(400)
         .json({ success: false, message: "Order is not found" });
     }
+
+    //update payment mode
+    await findOrder.updatePaymentMode("Cash");
+    //create invoice
     const invoice = await Invoice.create({
       amount: findOrder.totalAmount,
       currency: "INR",
       orderId,
     });
+    console.log("Invoice created, updating status to 'Pending'");
     await invoice.updateStatus("Pending");
-    return res
-      .status(200)
-      .json({ success: true, Data: invoice, message: "Server Error" });
+    return res.status(200).json({
+      success: true,
+      Data: invoice,
+      message: "Cash payment created  with invoice successfully",
+    });
   } catch (error) {
     console.error("Error creating order:", error);
     return res.status(500).json({

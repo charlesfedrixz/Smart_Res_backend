@@ -3,6 +3,7 @@ const customer = require("../models/customerModel");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const twilio = require("twilio");
+const getUserData = require("../middleware/authUser");
 
 const countryCode = "+91";
 const generateOTP = () => {
@@ -61,8 +62,9 @@ const resendOtp = asyncHandler(async (req, res) => {
   }
 });
 const deleteAccount = asyncHandler(async (req, res) => {
-  const { currentTableNumber } = req.body;
   try {
+    const { currentTableNumber } = req.body;
+
     const user = await customer.findOne({
       currentTableNumber,
     });
@@ -71,10 +73,15 @@ const deleteAccount = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: "User not found." });
     }
+    await customer.updateOne(
+      { _id: user._id },
+      { $set: { isLoggedIn: false } }
+    );
     await customer.deleteOne({ _id: user._id });
+
     return res.status(200).json({
       success: true,
-      message: "Account and associated orders deleted successfully.",
+      message: "Your Account logout successfully.",
     });
   } catch (error) {
     console.error(error.message);
@@ -103,6 +110,7 @@ const OtpVerify = async (req, res) => {
     }
     console.log(findCustomer.otp, otp);
     findCustomer.isVerified = true;
+    findCustomer.isLoggedIn = true;
     findCustomer.otp = undefined;
     findCustomer.otpExpire = undefined;
     await findCustomer.save();
@@ -175,6 +183,7 @@ const Register = asyncHandler(async (req, res) => {
       customerFind.currentTableNumber = currentTableNumber;
       customerFind.otp = otp;
       customerFind.otpExpire = Date.now() + 1000 * 60 * 5;
+      customerFind.isLoggedIn = true;
       await customerFind.save();
       //send otp function
       await sendOTPSMS(mobileNumber, otp);
@@ -193,6 +202,7 @@ const Register = asyncHandler(async (req, res) => {
         currentTableNumber: currentTableNumber,
         otp: otp,
         otpExpire: Date.now() + 1000 * 60 * 5,
+        isLoggedIn: false,
       });
 
       //send otp function

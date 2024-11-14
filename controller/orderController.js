@@ -3,6 +3,8 @@ const Order = require("../models/orderModels"); // Adjust the path as necessary
 const jwt = require("jsonwebtoken");
 const Food = require("../models/foodModels");
 const Category = require("../models/categoryModels");
+const { findById } = require("../models/invoicemodel");
+const Invoice = require("../models/invoicemodel");
 function getUserData(headers) {
   const authHeader = headers?.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -17,14 +19,14 @@ function getUserData(headers) {
   }
   try {
     const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-    if (!verifiedToken || !verifiedToken.id) {
+    if (!verifiedToken) {
       //user to id
       return {
         customerId: null,
       };
     }
     return {
-      customerId: verifiedToken.id, //user.id to id
+      customerId: verifiedToken.id,
     };
   } catch (error) {
     console.error("JWT verification error:", error.message);
@@ -32,36 +34,40 @@ function getUserData(headers) {
   }
 }
 
-function getAdminData(headers) {
-  // Split the Bearer token
-  const token = headers.authorization.split(" ")[1];
-  if (!token) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Token header missing", userId: null });
+function getCustomerData(headers) {
+  const authHeader = headers?.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.error(
+      "Authorization header is missing or does not contain Bearer token"
+    );
+    return { customerId: null };
   }
-  // console.log(token);
-  const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
-  // console.log(verifiedToken);
-
-  if (!verifiedToken)
+  const token = authHeader?.split(" ")[1];
+  if (!token) {
+    return { customerId: null };
+  }
+  try {
+    const verifiedToken = jwt.verify(token, process.env.JWT_SECRET);
+    if (!verifiedToken) {
+      //user to id
+      return {
+        customerId: null,
+      };
+    }
     return {
-      success: false,
-      message: "Invalid token",
-      userId: null,
+      customerId: verifiedToken.user?.id,
     };
-  return {
-    success: true,
-    message: "Token verified successfully",
-    userId: verifiedToken.id, // Assuming the token payload contains the user ID as 'id'
-  };
+  } catch (error) {
+    console.error("JWT verification error:", error.message);
+    return { customerId: null }; // Invalid or malformed token
+  }
 }
 
 const createOrder = async (req, res) => {
   try {
     const { foodItems } = req.body;
-    const userData = getUserData(req.headers);
-    if (!userData?.customerId) {
+    const userData = getCustomerData(req.headers);
+    if (!userData.customerId) {
       return res
         .status(403)
         .json({ success: false, message: "User Expired Please log in again" });
@@ -74,7 +80,7 @@ const createOrder = async (req, res) => {
     const order = new Order({
       customerId: userData?.customerId,
       foodItems: foodItems.map((item) => ({
-        foodId: new mongoose.Types.ObjectId(item.id),
+        foodId: new mongoose.Types.ObjectId(item.foodId),
         quantity: item.quantity,
       })),
     });
@@ -86,7 +92,6 @@ const createOrder = async (req, res) => {
         .json({ success: false, message: response.message });
     }
     await order.save();
-    console.log(order);
     return res
       .status(200)
       .json({ success: true, order, message: "Order created successfully" });
@@ -112,7 +117,20 @@ const deleteOrder = async (req, res) => {
         .status(200)
         .json({ success: true, message: "Order not found." });
     }
+    //delete order
     await Order.deleteOne({ _id: orderId });
+
+    //delete invoice
+
+    const invoice = await Invoice.findOne({ orderId: order._id });
+    if (invoice) {
+      await invoice.updateStatus("Cancelled");
+      console.log("Invoice status is update paid in the databse");
+    } else {
+      console.error(`Invoice for Order ID ${order._id} not found.`);
+    }
+
+    console.log("Associated invoice delete successfully.");
     return res
       .status(200)
       .json({ success: true, message: "Order deleted successfully." });
@@ -195,7 +213,7 @@ const tableOrder = async (req, res) => {
 //admin order list
 const adminOrderList = async (req, res) => {
   try {
-    const { userId } = getAdminData(req.headers);
+    const { userId } = getUserData(req.headers);
     if (!userId) {
       return res
         .status(400)
@@ -257,7 +275,7 @@ const listOrders = async (req, res) => {
 //
 const customerOrderlist = async (req, res) => {
   try {
-    const { customerId } = getUserData(req.headers);
+    const { customerId } = getCustomerData(req.headers);
     if (!customerId)
       return res
         .status(403)
@@ -366,6 +384,16 @@ const updateOrderPaymentBySocket = async (orderId, paid, socket) => {
     }
     await order.updateStatusPayment(paid);
     console.log("🚀 ~ updateOrderBySocket ~ order:");
+
+    if (paid === "Paid") {
+      const invoice = await Invoice.findOne({ orderId: order._id });
+      if (invoice) {
+        await invoice.updateStatus("Paid");
+        console.log("Invoice status is update paid in the databse");
+      } else {
+        console.error(`Invoice for Order ID ${order._id} not found.`);
+      }
+    }
     socket.emit("paymentResponse", {
       success: true,
       message: `Order status updated to: ${paid}`,
@@ -478,7 +506,6 @@ const updateFoodItemStatus = async (req, res) => {
 
 const getItemPriceById = async (foodId) => {
   try {
-    console.log(foodId);
     const foodItem = await Food.findById(foodId); // Assuming you have a FoodItems model
     if (!foodItem) {
       throw new Error(`Food item not found for ID: ${foodId}`);
@@ -492,13 +519,18 @@ const getItemPriceById = async (foodId) => {
 const addOrder = async (req, res) => {
   try {
     const { orderId, foodItems } = req.body;
-    const customer = getUserData(req.headers);
-    if (!customer)
+    const customer = getCustomerData(req.headers);
+    if (!customer.customerId)
       return res
         .status(403)
         .json({ success: false, message: "User Expired Please log in again" });
 
-    if (!foodItems || !orderId) {
+    if (
+      !orderId ||
+      !foodItems ||
+      !Array.isArray(foodItems) ||
+      foodItems.length === 0
+    ) {
       return res
         .status(400)
         .json({ success: false, message: "provide food item  and orderid..." });
@@ -528,30 +560,32 @@ const addOrder = async (req, res) => {
     const newItemsAmount = await Promise.all(
       foodItems.map(async (item) => {
         try {
-          const itemPrice = await getItemPriceById(item.id);
+          const itemPrice = await getItemPriceById(item.foodId);
           if (!itemPrice) {
             return res.status(400).json({
               success: false,
               message: `Food item price not found for ID: ${item.foodId}`,
             });
           }
-          console.log("Item Price for", item.id, ":", itemPrice);
           return item.quantity * itemPrice;
         } catch (error) {
-          console.error(`Error fetching price for item ID: ${item.id}`, error);
+          console.error(
+            `Error fetching price for item ID: ${item.foodId}`,
+            error
+          );
           return res.status(500).json({
             success: false,
-            message: `Error fetching price for item ID: ${item.id}`,
+            message: `Error fetching price for item ID: ${item.foodId}`,
           });
         }
       })
     );
     const newItemsTotalAmount = newItemsAmount.reduce(
-      (sum, price) => sum + price,
+      (sum, price) => sum + (Number(price) || 0),
       0
     );
     order.newItemsTotalAmount =
-      (order.newItemsTotalAmount || 0) + newItemsTotalAmount;
+      Number(order.newItemsTotalAmount || 0) + newItemsTotalAmount;
     await order.save();
 
     return res
@@ -559,9 +593,11 @@ const addOrder = async (req, res) => {
       .json({ success: true, order, message: "AddOrder update successfully" });
   } catch (error) {
     console.error("Error adding new order:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Error adding new order" });
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Error adding new order" });
+    }
   }
 };
 
@@ -667,6 +703,7 @@ const customerlistOrder = async (req, res) => {
 const dailyOrder = async (req, res) => {
   try {
     const { customerId } = getUserData(req.headers);
+    console.log("customerId:", customerId);
     if (!customerId)
       return res
         .status(400)
@@ -761,13 +798,11 @@ const todayDeleteOrder = async (req, res) => {
         .status(200)
         .json({ success: true, message: "No order found for today" });
     }
-    return res
-      .status(200)
-      .json({
-        success: true,
-        todayDelete,
-        messagge: `Successfully deleted ${todayDelete.deletedCount} orders for today`,
-      });
+    return res.status(200).json({
+      success: true,
+      todayDelete,
+      messagge: `Successfully deleted ${todayDelete.deletedCount} orders for today`,
+    });
   } catch (error) {
     console.error("Error in getting today deeleted order");
   }

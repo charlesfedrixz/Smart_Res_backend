@@ -20,6 +20,10 @@ const customerSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isLoggedIn: {
+      type: Boolean,
+      default: false, // Default to false, set to true only when logged in
+    },
   },
   { timestamps: true }
 );

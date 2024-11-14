@@ -30,6 +30,11 @@ const orderSchema = new mongoose.Schema(
       enum: ["Paid", "Unpaid"],
       default: "Unpaid",
     },
+    paymentMode: {
+      type: String,
+      enum: ["Online", "Offline"],
+      default: "Offline",
+    },
   },
   { timestamps: true }
 );
@@ -40,19 +45,19 @@ orderSchema.methods.calculateTotalAmount = async function () {
   let totalAmount = 0;
 
   for (const item of this.foodItems) {
-    const food = await Food.findById(item.foodId);
-    if (!food) {
+    // const food = await Food.findById(item.foodId);
+    if (!item.foodId) {
       return {
         success: false,
         message: `Food item with ID ${item.foodId} not found.`,
       };
     }
-    totalAmount += food.price * item.quantity;
+    totalAmount += item.foodId.price * item.quantity;
   }
   this.totalAmount = totalAmount;
   return {
     success: true,
-    message: `Order placed successfully`,
+    message: `Calculate Total Amount  Successfully`,
   };
 };
 
