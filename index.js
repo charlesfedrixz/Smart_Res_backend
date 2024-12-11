@@ -19,8 +19,8 @@ const {
   updateOrderBySocket,
   updateOrderPaymentBySocket,
 } = require('./controller/orderController');
-
-const app = express();
+const invoiceRoute = require('./routes/invoiceRoute');
+const restaurantRoute = require('./routes/restaurantRoute');
 
 // Middleware
 app.use(express.json());
@@ -53,7 +53,6 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
 // Database connection
 connectDB();
 
-// API Routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/food', foodRoutes);
@@ -61,8 +60,8 @@ app.use('/api/customer', customerRoutes);
 app.use('/api/order', orderRoutes.order);
 app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
+app.use('/api/restaurant', restaurantRoute);
 
-// Server setup
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {

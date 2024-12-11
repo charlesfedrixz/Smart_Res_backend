@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const twilio = require("twilio");
 const getUserData = require("../middleware/authUser");
+const Restaurant = require("../models/restaurantModel");
 
 const countryCode = "+91";
 const generateOTP = () => {
@@ -13,9 +14,10 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID; // Your Account SID from www.
 const authToken = process.env.TWILIO_AUTH_TOKEN; // Your Auth Token from www.twilio.com/console
 const client = twilio(accountSid, authToken);
 
-async function sendOTPSMS(mobileNumber, otp) {
+async function sendOTPSMS(restaurantNumber, otp) {
   try {
-    const formattedPhoneNumber = `${countryCode}${mobileNumber.replace(
+    console.log("phone:", restaurantNumber);
+    const formattedPhoneNumber = `${countryCode}${restaurantNumber.replace(
       /\D/g,
       ""
     )}`;
@@ -28,7 +30,7 @@ async function sendOTPSMS(mobileNumber, otp) {
     });
     console.log(`Message sent: ${message.sid}`);
   } catch (error) {
-    console.error(error);
+    console.error("Error in sending otp", error);
   }
 }
 const resendOtp = asyncHandler(async (req, res) => {
@@ -91,16 +93,19 @@ const deleteAccount = asyncHandler(async (req, res) => {
 
 const OtpVerify = async (req, res) => {
   try {
-    const { mobileNumber, otp } = req.body;
+    const { name, otp } = req.body;
+    console.log("Data:", name, otp);
 
-    if (!mobileNumber || !otp) {
+    if (!name || !otp) {
       return res
         .status(400)
         .json({ success: false, message: "Please provide the field." });
     }
-    const findCustomer = await customer.findOne({ mobileNumber });
+    const findCustomer = await customer.findOne({ name });
     if (!findCustomer) {
-      return res.status(200).json({ success: false, message: "No Data found" });
+      return res
+        .status(200)
+        .json({ success: false, message: "Customer not found" });
     }
     if (findCustomer.otp !== otp) {
       return res.status(400).json({ success: false, message: "Invalid OTP." });
@@ -108,7 +113,8 @@ const OtpVerify = async (req, res) => {
     if (findCustomer.otpExpire < Date.now()) {
       return res.status(400).json({ success: false, message: "Expired OTP." });
     }
-    console.log(findCustomer.otp, otp);
+    console.log("otp:", findCustomer.otp);
+    const findRestaurant = await Restaurant.findById(findCustomer.restaurant);
     findCustomer.isVerified = true;
     findCustomer.isLoggedIn = true;
     findCustomer.otp = undefined;
@@ -118,7 +124,8 @@ const OtpVerify = async (req, res) => {
     const payload = {
       user: {
         id: findCustomer._id,
-        mobileNumber: findCustomer.mobileNumber,
+        name: findCustomer.name,
+        restaurant: findRestaurant.name,
       },
     };
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -128,23 +135,31 @@ const OtpVerify = async (req, res) => {
       success: true,
       token,
       Data: {
-        findCustomer,
+        Restaurant: findRestaurant.name,
+        Table_No: findCustomer.currentTableNumber,
       },
       message: "OTP verified with success",
     });
   } catch (error) {
-    console.error(error);
-    return res.status(400).json({ success: false, message: error });
+    console.error("Error in verifying otp", error);
+    return res.status(400).json({ success: false, message: "Server Error" });
   }
 };
 
 const Register = asyncHandler(async (req, res) => {
   try {
-    const { mobileNumber, currentTableNumber } = req.body;
-    if (!mobileNumber || !currentTableNumber) {
+    const { mobileNumber, currentTableNumber, name, guest, restaurant } =
+      req.body;
+    if (
+      !mobileNumber ||
+      !currentTableNumber ||
+      !name ||
+      !guest ||
+      !restaurant
+    ) {
       return res
         .status(400)
-        .json({ success: false, message: "Please provide a Mobile Number" });
+        .json({ success: false, message: "Please provide a require fields" });
     }
     const customerFind = await customer.findOne({ mobileNumber });
     if (
@@ -221,9 +236,72 @@ const Register = asyncHandler(async (req, res) => {
     return res.status(500).json({ success: true, message: "Server Error" });
   }
 });
+
+const login = asyncHandler(async (req, res) => {
+  try {
+    const { restaurant } = req.params;
+
+    const { phone, currentTableNumber, name, guest } = req.body;
+    console.log("name:", restaurant, phone, currentTableNumber, name, guest);
+    if (!phone || !currentTableNumber || !name || !guest || !restaurant) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide a require fields" });
+    }
+
+    const findRestaurant = await Restaurant.findOne({ name: restaurant });
+    if (!findRestaurant) {
+      return res
+        .status(400)
+        .json({ success: false, message: `${Restaurant} not found` });
+    }
+    const restaurantNumber = findRestaurant.contact.phone;
+    const customerFind = await customer.findOne({ name });
+    if (!customerFind) {
+      const otp = generateOTP();
+      //send otp function
+      await sendOTPSMS(restaurantNumber, otp);
+      const newCustomer = await customer.create({
+        name,
+        currentTableNumber,
+        guest,
+        phone,
+        restaurant: findRestaurant._id,
+        otp: otp,
+        otpExpire: Date.now() + 1000 * 60 * 5, //5 minutes
+      });
+      return res.status(201).json({
+        success: "true",
+        message: "New customer cerated successfully.",
+        Data: {
+          OTP: otp,
+          Table_No: newCustomer.currentTableNumber,
+          numberOfGuest: newCustomer.guest,
+          Restaurant: findRestaurant.name,
+        },
+      });
+    }
+    if (!customerFind.isVerified) {
+      const otp = generateOTP();
+      customerFind.otp = otp;
+      customerFind.otpExpire = Date.now() + 1000 * 60 * 5;
+      customerFind.save();
+      await sendOTPSMS(restaurantNumber, otp);
+      return res.status(200).json({
+        success: "true",
+        Data: { OTP: otp },
+        message: "Customer otp is send.",
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: true, message: "Server Error" });
+  }
+});
 module.exports = {
   resendOtp: resendOtp,
   deleteAccount: deleteAccount,
   OtpVerify: OtpVerify,
   Register: Register,
+  login: login,
 };
