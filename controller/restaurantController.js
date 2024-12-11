@@ -21,6 +21,7 @@ const cloudinaryUpload = (imageBuffer) => {
           { width: 800, height: 800, crop: 'limit' },
           { quality: 'auto' },
           { fetch_format: 'auto' },
+
         ],
       },
       (error, result) => {
@@ -38,6 +39,7 @@ const cloudinaryUpload = (imageBuffer) => {
 //create restaurant
 const create = asyncHandler(async (req, res) => {
   // TODO: Make the cover image optional
+
   try {
     const { name, slug, description, email, phone, address, taxPercentage } =
       req.body;
@@ -79,6 +81,7 @@ const create = asyncHandler(async (req, res) => {
         .toBuffer();
 
       const logoUpload = await cloudinaryUpload(logoBuffer);
+
       let coverImageUpload = {
         secure_url: '',
         public_id: '',
@@ -101,7 +104,6 @@ const create = asyncHandler(async (req, res) => {
         contact: { email, phone, address },
         settings: { taxPercentage },
       });
-
       return res.status(201).json({
         success: true,
         newRestaurant,
@@ -185,6 +187,7 @@ const edit = asyncHandler(async (req, res) => {
     if (!restaurantId) {
       return res
         .status(400)
+
         .json({ success: false, message: 'Please provide a restaurantId' });
     }
     // Find the restaurant first
@@ -253,6 +256,7 @@ const edit = asyncHandler(async (req, res) => {
       // Delete old cover image from Cloudinary
       if (restaurant.coverImage) {
         const oldCoverImagePublicId = restaurant.coverImage
+
           .split('/')
           .pop()
           .split('.')[0];
@@ -335,6 +339,7 @@ const getRestaurantById = asyncHandler(async (req, res) => {
     message: 'Restaurant fetched successfully',
   });
 });
+
 
 module.exports = {
   create,
