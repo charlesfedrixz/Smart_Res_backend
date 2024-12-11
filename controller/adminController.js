@@ -6,12 +6,13 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
+const Restaurant = require("../models/restaurantModel");
 //create user
 const createUser = asyncHandler(async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, name, role, restaurant } = req.body;
     // Basic validation
-    if (!email && !password) {
+    if (!email || !password || !name || !role) {
       return res
         .status(400)
         .json({ success: false, message: "Please provide all fields." });
@@ -29,6 +30,7 @@ const createUser = asyncHandler(async (req, res) => {
         message: "Please enter password minimum 8 length..",
       });
     }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -37,40 +39,76 @@ const createUser = asyncHandler(async (req, res) => {
         .json({ success: false, message: "Email is already registered." });
     }
 
-    //hashing password
-    //const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (role === "Restaurant_Admin") {
+      if (!restaurant) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Please provide a restaurant." });
+      }
+      // Look up the restaurant by name
+      const findRestaurant = await Restaurant.findOne({ name: restaurant });
+      if (!findRestaurant) {
+        return res.status(404).json({
+          success: false,
+          message: ` "${restaurant}" Restaurant not found.`,
+        });
+      }
+      //hashing password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      //Create a new user
+      const newUser = await User.create({
+        email,
+        name,
+        role,
+        restaurant: findRestaurant._id,
+        password: hashedPassword,
+      });
 
+      return res.status(200).json({
+        success: true,
+        newUser,
+        message: `${role} signed up successfully.`,
+      });
+    }
+
+    //hashing password
+    const hashedPassword = await bcrypt.hash(password, 10);
     //Create a new user
-    const newUser = await User.create({ email, password: hashedPassword });
+    const newUser = await User.create({
+      email,
+      name,
+      role,
+      password: hashedPassword,
+    });
 
     return res.status(200).json({
       success: true,
       newUser,
-      message: "Admin signed up successfully.",
+      message: `${role} signed up successfully.`,
     });
   } catch (error) {
-    console.error(error);
+    console.error("error in creating admin user", error);
     return res.status(500).json({ success: true, message: "Server Error" });
   }
 });
 
 //login
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { name, password } = req.body;
   try {
-    const existingUser = await User.findOne({ email });
+    console.log("object: ", name, password);
+    const existingUser = await User.findOne({ name: name });
     // Check if user exists
     if (!existingUser) {
       return res
         .status(404)
-        .json({ success: false, message: "Admin does not exits" });
+        .json({ success: false, message: "User does not exits" });
     }
     // Compare passwords
     const matchPassword = await bcrypt.compare(password, existingUser.password);
     if (!matchPassword) {
       return res
-        .status(400)
+        .status(401)
         .json({ success: false, message: "Invalid password" });
     }
     const token = jwt.sign(
@@ -78,22 +116,38 @@ const login = asyncHandler(async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
+    if (existingUser.role !== "Restaurant_Admin") {
+      return res.status(201).json({
+        success: true,
+        token,
+        Data: { Role: existingUser.role },
+        message: `${existingUser.role} Login successfull.`,
+      });
+    }
+
+    const findRestaurant = await Restaurant.findById(existingUser.restaurant);
+    if (!findRestaurant) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Restaurant not found" });
+    }
+
     return res.status(201).json({
       success: true,
       token,
-      email,
-      message: "Admin Login successfull.",
+      Data: { Role: existingUser.role, Restaurant: findRestaurant.name },
+      message: `${existingUser.role} Login successfull.`,
     });
   } catch (error) {
     console.log(error);
-    return res
-      .status(500)
-      .json({ success: false, token, email, message: "Server Error" });
+    return res.status(500).json({ success: false, message: "Server Error" });
   }
 });
 
-//request for password reset
-
+const generateOTP = () => {
+  const otp = (crypto.randomBytes(3).readUIntBE(0, 3) % 900000) + 100000;
+  return otp.toString();
+};
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
@@ -104,6 +158,28 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const sendOtpMail = async (email, otp) => {
+  try {
+    const mailOptions = {
+      from: {
+        name: "achaathak.com",
+        address: process.env.EMAIL,
+      },
+      to: email,
+      subject: "Email verification one-time-password(OTP) . ",
+      text: `
+      Your code is: ${otp}. 
+      Use this code to verify your email & password and not to share to anyone.
+      This code will expire in 1 hours.`,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log("OTP sent to email successfully");
+  } catch (error) {
+    console.error("Error sending OTP email:", error);
+  }
+};
+
+//request for password reset
 const requestPasswordReset = asyncHandler(async (req, res) => {
   try {
     const { email } = req.body;
@@ -163,16 +239,16 @@ const verifiedEmailOTP = asyncHandler(async (req, res) => {
     if (finduser.otp !== otp || finduser.otpExpire < Date.now()) {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
-    const token = jwt.sign({ id: finduser._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
+    // const token = jwt.sign({ id: finduser._id }, process.env.JWT_SECRET, {
+    //   expiresIn: "1d",
+    // });
     finduser.isOTPVerified = true;
     finduser.otp = undefined;
     finduser.otpExpire = undefined;
     await finduser.save();
     return res
       .status(200)
-      .json({ success: true, token, message: "OTP verified successfully" });
+      .json({ success: true, message: "OTP verified successfully" });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Server Error" });

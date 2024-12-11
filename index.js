@@ -22,6 +22,7 @@ const {
   updateOrderPaymentBySocket,
 } = require("./controller/orderController");
 const invoiceRoute = require("./routes/invoiceRoute");
+const restaurantRoute = require("./routes/restaurantRoute");
 
 app.use(express.json());
 app.use(
@@ -53,6 +54,7 @@ app.use("/api/customer", customerRoutes);
 app.use("/api/order", orderRoutes.order);
 app.use("/api/pay", payments);
 app.use("/api/invoice", invoiceRoute);
+app.use("/api/restaurant", restaurantRoute);
 
 const server = http.createServer(app);
 const io = new Server(server, {

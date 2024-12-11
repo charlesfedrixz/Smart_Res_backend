@@ -2,7 +2,11 @@ const Food = require("../models/foodModels");
 require("dotenv").config();
 const asyncHandler = require("express-async-handler");
 const getUserData = require("../middleware/authUser");
+const Restaurant = require("../models/restaurantModel");
+const Category = require("../models/categoryModels");
 const cloudinary = require("cloudinary").v2;
+const sharp = require("sharp");
+const User = require("../models/adminModel");
 
 // Configuration
 cloudinary.config({
@@ -19,18 +23,69 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: "User Expired Please log in again" });
     }
-    const { name, description, category, price } = req.body;
-    const image = req.file;
+    const finduser = await User.findById(userId);
+    if (!finduser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please log in again.",
+      });
+    }
+    if (!["Restaurant_Admin", "Super_Admin"].includes(finduser.role)) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Access denied. Unauthorized role." });
+    }
+    const { restaurant } = req.params;
+    const findrestaurant = await Restaurant.findOne({ name: restaurant });
+    if (!findrestaurant) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found.",
+      });
+    }
+    if (finduser.role !== "Super_Admin") {
+      if (!findrestaurant._id.equals(finduser.restaurant)) {
+        return res.status(404).json({
+          success: false,
+          message: "Access denied Restaurant mismatch",
+        });
+      }
+    }
 
-    if (!name || !description || !category || !price || !image) {
+    const { name, description, category, price, subCategory } = req.body;
+    const image = req.file;
+    if (
+      !name ||
+      !description ||
+      !category ||
+      !subCategory ||
+      !price ||
+      !image ||
+      !restaurant
+    ) {
       return res
         .status(400)
         .json({ success: false, messagae: "Please provide all the field..." });
     }
+
+    //convert image to webp format
+    const compressedBuffer = await sharp(image.buffer)
+      .resize({ width: 800, height: 800, fit: "inside" })
+      .webp({ quality: 80 })
+      .toBuffer();
+
     // Upload image to Cloudinary
     const cloudinaryUpload = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: "image" },
+        {
+          resource_type: "image",
+          format: "webp",
+          transformation: [
+            { width: 800, height: 800, crop: "limit" },
+            { quality: "auto" },
+            { fetch_format: "auto" },
+          ],
+        },
         (error, result) => {
           if (error) {
             reject(error);
@@ -39,12 +94,7 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
           }
         }
       );
-      // Stream the file to Cloudinary
-      if (image && image.buffer) {
-        uploadStream.end(image.buffer);
-      } else {
-        reject(new Error("Image upload failed"));
-      }
+      uploadStream.end(compressedBuffer);
     });
 
     if (!cloudinaryUpload) {
@@ -52,16 +102,33 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
         .status(400)
         .json({ success: false, message: "Error in uploading image." });
     }
+    //find category
+    const findCategory = await Category.findOne({ category });
+    if (!findCategory) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Category not found" });
+    }
+
+    //find subcategory
+    const subcategories = findCategory.subcategory.includes(subCategory);
+    if (!subcategories) {
+      return res
+        .status(400)
+        .json({ success: false, message: `${subCategory} not found` });
+    }
 
     // Create new food entry with the image URL from Cloudinary
     const newFood = await Food.create({
       name,
       description,
-      category,
+      category: findCategory._id,
+      subcategory: subcategories,
       price,
+      restaurant: findrestaurant._id,
       image: cloudinaryUpload.secure_url,
       publicId: cloudinaryUpload.public_id, // Use the secure URL from Cloudinary
-      userId, // Assuming userId refers to the admin or the creator of the food item
+      user: userId, // Assuming userId refers to the admin or the creator of the food item
     });
     // Send success response
     return res
@@ -72,6 +139,7 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error" });
   }
 });
+
 //delete food
 const deleteFood = async (req, res) => {
   try {
@@ -123,16 +191,25 @@ const deleteFood = async (req, res) => {
 //list food
 const listFood = async (req, res) => {
   try {
-    const foods = await Food.find({}).populate("userId", "email");
-    if (!foods) {
+    const { restaurant } = req.params;
+    const findrestaurant = await Restaurant.findOne({ name: restaurant });
+    if (!findrestaurant) {
       return res
         .status(400)
-        .json({ success: false, message: "Food is not found..." });
+        .json({ success: false, message: "Restaurant not found..." });
+    }
+
+    const foods = await Food.find({ restaurant: findrestaurant._id });
+    if (!foods || foods.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No food found for this restaurant.",
+      });
     }
     return res.status(200).json({
       success: true,
       Data: foods,
-      message: "food listed successfully",
+      message: "Foods fetched successfully.",
     });
   } catch (error) {
     console.log(error);
@@ -241,14 +318,9 @@ const editFood = async (req, res) => {
 //list food by category
 const getFoodByCategory = async (req, res) => {
   try {
-    const { category } = req.query; // Assuming the category is passed as a query parameter
-    if (!category) {
-      return res.status(400).json({
-        success: false,
-        message: "Category is required",
-      });
-    }
-    const foodItems = await Food.find({ userId: userId, category: category });
+    const defaultCategory = "ChaBora 1902"; // Assuming the category is passed as a query parameter
+
+    const foodItems = await Food.find({ category: defaultCategory });
     if (!foodItems || foodItems.length === 0) {
       return res.status(404).json({
         success: false,
@@ -258,36 +330,38 @@ const getFoodByCategory = async (req, res) => {
     return res.status(200).json({
       success: true,
       foodItems,
-      message: `${category} category is listed...`,
+      message: `${defaultCategory} category is listed...`,
     });
   } catch (error) {
     return res.status(500).json({ success: false, messagae: "Server Error" });
   }
 };
-//search food
-// const searchFood = async (req, res) => {
-//   try {
-//     const { foodName } = req.params;
-//     console.log("foodName:", foodName);
-//     const food = await Food.find({ name: { $regex: foodName, $options: "i" } });
-//     console.log("food:", food);
-//     if (!foodName) {
-//       return res
-//         .status(200)
-//         .json({ success: true, food, messagae: "Provide a food name" });
-//     }
-//     // if (!food || food.length === 0) {
-//     //   return res
-//     //     .status(200)
-//     //     .json({ success: true, food: [], messagae: "Food is not found" });
-//     // }
-//     return res
-//       .status(200)
-//       .json({ success: true, food, messagae: "Food is here..." });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, messagae: "Server Error" });
-//   }
-// };
+
+const getFoodByCategory1 = async (req, res) => {
+  try {
+    // Default category
+    const defaultCategory = "RoofTop Cafe";
+
+    // Fetch food items by the default category
+    const foodItems = await Food.find({ category: defaultCategory });
+
+    if (!foodItems || foodItems.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No food items found for the category: ${defaultCategory}`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      foodItems,
+      message: `${defaultCategory} category food items listed successfully.`,
+    });
+  } catch (error) {
+    console.error("Error fetching food items:", error);
+    return res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
 
 const searchFood = async (req, res) => {
   try {
@@ -295,34 +369,52 @@ const searchFood = async (req, res) => {
 
     // Check if foodName is provided
     if (!foodName) {
-      return res
-        .status(400)
-        .json({ success: false, food: [], message: "Provide a food name" });
+      return res.status(400).json({
+        success: false,
+        food: [],
+        message: "Provide a food name",
+      });
     }
 
-    // Perform the search using regex for case-insensitive match
-    const food = await Food.find({ name: { $regex: foodName, $options: "i" } });
+    const alphabetPattern = foodName
+      .split("") // Split each character
+      .map((char) => `(?=.*${char})`) // Ensure each character is present
+      .join("");
 
-    // If food array is empty, return food not found message
+    // Create a regex pattern for fuzzy search (matching any substring case-insensitively)
+    const regexPattern = new RegExp(alphabetPattern, "i");
+    // Perform the search using the regex pattern
+    const food = await Food.find({
+      name: { $regex: regexPattern }, // Removed $options since regexPattern already includes 'i'
+    });
+
+    // If food array is empty, perform a partial match search
     if (food.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, food: [], message: "Food is not found" });
+      return res.status(404).json({
+        success: false,
+        food: [],
+        message: "Food is not found",
+      });
     }
-
-    // Return the found food items
-    return res
-      .status(200)
-      .json({ success: true, food, message: "Food is here..." });
+    // Return the found food items for exact search
+    return res.status(200).json({
+      success: true,
+      food,
+      message: "Food is here...",
+    });
   } catch (error) {
     console.error("Server Error:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
   }
 };
 
 module.exports = {
   listFood,
   getFoodByCategory,
+  getFoodByCategory1,
   searchFood,
   editFood,
   insertFoodCloud,

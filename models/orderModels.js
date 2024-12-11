@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const Food = require("./foodModels");
 const orderSchema = new mongoose.Schema(
   {
     customerId: {
