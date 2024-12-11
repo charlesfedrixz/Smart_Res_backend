@@ -1,11 +1,14 @@
-const express = require("express");
-const multer = require("multer");
+
+const express = require('express');
+const multer = require('multer');
+
 const {
   create,
   deleted,
   edit,
   fetch,
-} = require("../controller/restaurantController");
+  getRestaurantById,
+} = require('../controller/restaurantController');
 const restaurantRoute = express.Router();
 
 const storage = multer.memoryStorage();
@@ -15,22 +18,24 @@ const upload = multer({
 });
 
 restaurantRoute.post(
-  "/create",
+  '/create',
   upload.fields([
-    { name: "logo", maxCount: 1 },
-    { name: "coverImage", maxCount: 1 },
+    { name: 'logo', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 },
   ]),
   create
 );
-restaurantRoute.delete("/delete", deleted);
+restaurantRoute.delete('/delete/:restaurantId', deleted);
 restaurantRoute.put(
-  "/update/:restaurantId",
+  '/update/:restaurantId',
   upload.fields([
-    { name: "logo", maxCount: 1 },
-    { name: "coverImage", maxCount: 1 },
+    { name: 'logo', maxCount: 1 },
+    { name: 'coverImage', maxCount: 1 },
   ]),
   edit
 );
-restaurantRoute.get("/list", fetch);
+
+restaurantRoute.get('/getall', fetch);
+restaurantRoute.get('/getById/:restaurantId', getRestaurantById);
 
 module.exports = restaurantRoute;
