@@ -3,4 +3,4 @@ node_modules
 .vscode
 cred.json
 uploads/*
-
+endpoints.js
