@@ -19,9 +19,8 @@ const {
   updateOrderBySocket,
   updateOrderPaymentBySocket,
 } = require('./controller/orderController');
+const invoiceRoute = require('./routes/invoiceRoute');
 const restaurantRoute = require('./routes/restaurantRoute');
-
-const app = express();
 
 // Middleware
 app.use(express.json());
@@ -62,8 +61,8 @@ app.use('/api/order', orderRoutes.order);
 app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
+app.use('/api/restaurant', restaurantRoute);
 
-// Server setup
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
