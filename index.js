@@ -63,6 +63,7 @@ app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
 
+// Server setup
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
