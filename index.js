@@ -5,7 +5,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const bodyParser = require('body-parser');
+// const bodyParser = require('body-parser');
 
 const connectDB = require('./config/db');
 const { adminRoutes } = require('./routes/adminRoute');
@@ -19,8 +19,9 @@ const {
   updateOrderBySocket,
   updateOrderPaymentBySocket,
 } = require('./controller/orderController');
-const invoiceRoute = require('./routes/invoiceRoute');
 const restaurantRoute = require('./routes/restaurantRoute');
+
+const app = express();
 
 // Middleware
 app.use(express.json());
@@ -47,8 +48,8 @@ app.use((req, res, next) => {
 });
 
 // Increase payload size limits
-app.use(bodyParser.json({ limit: '100mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
+// app.use(bodyParser.json({ limit: '100mb' }));
+// app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
 
 // Database connection
 connectDB();
