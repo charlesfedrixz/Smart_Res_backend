@@ -1,33 +1,41 @@
-const User = require("../models/adminModel");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const validator = require("validator");
-const crypto = require("crypto");
-const nodemailer = require("nodemailer");
-const asyncHandler = require("express-async-handler");
-const getUserData = require("../middleware/authUser");
-const Restaurant = require("../models/restaurantModel");
+const User = require('../models/adminModel');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const validator = require('validator');
+const crypto = require('node:crypto');
+const nodemailer = require('nodemailer');
+const asyncHandler = require('express-async-handler');
+const getUserData = require('../middleware/authUser');
+const Restaurant = require('../models/restaurantModel');
+const mongoose = require('mongoose');
 //create user
 const createUser = asyncHandler(async (req, res) => {
   try {
+    const user = req.user;
+    if (user.role !== 'Super_Admin') {
+      return res
+        .status(401)
+        .json({ success: false, message: `${user.role} is not authorized` });
+    }
+
     const { email, password, name, role, restaurant } = req.body;
     // Basic validation
     if (!email || !password || !name || !role) {
       return res
         .status(400)
-        .json({ success: false, message: "Please provide all fields." });
+        .json({ success: false, message: 'Please provide all fields.' });
     }
     //validation for email
     if (!validator.isEmail(email)) {
       return res
         .status(400)
-        .json({ success: false, message: "Please enter a valid email.." });
+        .json({ success: false, message: 'Please enter a valid email..' });
     }
     //validation for password
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
-        message: "Please enter password minimum 8 length..",
+        message: 'Please enter password minimum 8 length..',
       });
     }
 
@@ -36,25 +44,36 @@ const createUser = asyncHandler(async (req, res) => {
     if (existingUser) {
       return res
         .status(400)
-        .json({ success: false, message: "Email is already registered." });
+        .json({ success: false, message: 'Email is already registered.' });
     }
 
-    if (role === "Restaurant_Admin") {
+    //hashing password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (role === 'Restaurant_Admin') {
       if (!restaurant) {
         return res
           .status(400)
-          .json({ success: false, message: "Please provide a restaurant." });
+          .json({ success: false, message: 'Please provide a restaurant.' });
       }
       // Look up the restaurant by name
-      const findRestaurant = await Restaurant.findOne({ name: restaurant });
+      let findRestaurant;
+      // * Better approach to check if the restaurant is a valid MongoDB ObjectId
+      if (mongoose.isValidObjectId(restaurant)) {
+        findRestaurant = await Restaurant.findById(restaurant);
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, message: 'Invalid restaurant ID.' });
+      }
+
       if (!findRestaurant) {
         return res.status(404).json({
           success: false,
           message: ` "${restaurant}" Restaurant not found.`,
         });
       }
-      //hashing password
-      const hashedPassword = await bcrypt.hash(password, 10);
+
       //Create a new user
       const newUser = await User.create({
         email,
@@ -71,8 +90,6 @@ const createUser = asyncHandler(async (req, res) => {
       });
     }
 
-    //hashing password
-    const hashedPassword = await bcrypt.hash(password, 10);
     //Create a new user
     const newUser = await User.create({
       email,
@@ -87,60 +104,73 @@ const createUser = asyncHandler(async (req, res) => {
       message: `${role} signed up successfully.`,
     });
   } catch (error) {
-    console.error("error in creating admin user", error);
-    return res.status(500).json({ success: true, message: "Server Error" });
+    console.error('error in creating admin user', error);
+    return res.status(500).json({ success: true, message: 'Server Error' });
   }
 });
 
 //login
 const login = asyncHandler(async (req, res) => {
-  const { name, password } = req.body;
+  const { email, password } = req.body;
   try {
-    console.log("object: ", name, password);
-    const existingUser = await User.findOne({ name: name });
+    const existingUser = await User.findOne({ email: email });
     // Check if user exists
     if (!existingUser) {
       return res
         .status(404)
-        .json({ success: false, message: "User does not exits" });
+        .json({ success: false, message: 'User does not exits' });
     }
     // Compare passwords
     const matchPassword = await bcrypt.compare(password, existingUser.password);
     if (!matchPassword) {
       return res
         .status(401)
-        .json({ success: false, message: "Invalid password" });
+        .json({ success: false, message: 'Invalid password' });
     }
     const token = jwt.sign(
       { email: existingUser.email, id: existingUser._id },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: '1d' }
     );
-    if (existingUser.role !== "Restaurant_Admin") {
-      return res.status(201).json({
-        success: true,
-        token,
-        Data: { Role: existingUser.role },
-        message: `${existingUser.role} Login successfull.`,
-      });
-    }
+    // Create a new object without sensitive data
+    // Using password: _ to destructure and discard the password field from the object
+    // The underscore (_) is a convention to indicate we're intentionally ignoring this value
+    // This creates a new object userDataWithoutSensitiveInfo that has all fields except password
+    const { password: _, ...userDataWithoutSensitiveInfo } =
+      existingUser.toObject();
 
-    const findRestaurant = await Restaurant.findById(existingUser.restaurant);
-    if (!findRestaurant) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Restaurant not found" });
-    }
-
-    return res.status(201).json({
+    res.cookie('jwt', token, {
+      httpOnly: true, // Prevents client-side access to cookie
+      secure: true, // secure:true won't work for http://localhost testing. Only use in production with HTTPS. sameSite:'none' also requires HTTPS in production
+      sameSite: 'none', // Strict in prod, none for local cross-origin testing
+      path: '/', // Cookie path
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day expiry
+      maxAge: 24 * 60 * 60 * 1000, // Alternative to expires
+    });
+    // if (existingUser.role !== 'Restaurant_Admin') {
+    return res.status(200).json({
       success: true,
-      token,
-      Data: { Role: existingUser.role, Restaurant: findRestaurant.name },
+      data: userDataWithoutSensitiveInfo,
       message: `${existingUser.role} Login successfull.`,
     });
+    // }
+
+    // const findRestaurant = await Restaurant.findById(existingUser.restaurant);
+    // if (!findRestaurant) {
+    //   return res
+    //     .status(401)
+    //     .json({ success: false, message: 'Restaurant not found' });
+    // }
+
+    // return res.status(201).json({
+    //   success: true,
+    //   token,
+    //   Data: { Role: existingUser.role, Restaurant: findRestaurant.name },
+    //   message: `${existingUser.role} Login successfull.`,
+    // });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -149,9 +179,10 @@ const generateOTP = () => {
   return otp.toString();
 };
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  // host: 'smtp.gmail.com',
+  // port: 587,
+  service: 'gmail',
+  secure: true,
   auth: {
     user: process.env.EMAIL,
     pass: process.env.APP_PASSWORD,
@@ -161,21 +192,19 @@ const transporter = nodemailer.createTransport({
 const sendOtpMail = async (email, otp) => {
   try {
     const mailOptions = {
-      from: {
-        name: "achaathak.com",
-        address: process.env.EMAIL,
-      },
+      from: 'Chand Tekcham <tekchamchand@gmail.com>',
       to: email,
-      subject: "Email verification one-time-password(OTP) . ",
-      text: `
-      Your code is: ${otp}. 
-      Use this code to verify your email & password and not to share to anyone.
-      This code will expire in 1 hours.`,
+      subject: 'Email verification one-time-password(OTP) . ',
+      html: `
+      <h1>Your code is: ${otp}. </h1>
+      <p>Use this code to verify your email & password and not to share to anyone.</p>
+      <p>This code will expire in 1 hours.</p>
+      `,
     };
     await transporter.sendMail(mailOptions);
-    console.log("OTP sent to email successfully");
+    console.log('OTP sent to email successfully');
   } catch (error) {
-    console.error("Error sending OTP email:", error);
+    console.error('Error sending OTP email:', error);
   }
 };
 
@@ -187,7 +216,7 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, message: "Email not found" });
+        .json({ success: false, message: 'Email not found' });
     }
     const generateOTP = () => {
       return crypto.randomInt(100000, 999999).toString();
@@ -199,11 +228,11 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
     await user.save();
     const mailOptions = {
       from: {
-        name: "Smart Restaurant",
+        name: 'Smart Restaurant',
         address: process.env.EMAIL,
       },
       to: email,
-      subject: "Email verification one-time-password(OTP) . ",
+      subject: 'Email verification one-time-password(OTP) . ',
       text: `    Smart Restaurant is received a request to reset your Gmail password.
 
       Your code is: ${otp}. 
@@ -215,10 +244,10 @@ const requestPasswordReset = asyncHandler(async (req, res) => {
     await transporter.sendMail(mailOptions);
     return res
       .status(201)
-      .json({ success: true, message: "Password reset link sent" });
+      .json({ success: true, message: 'Password reset link sent' });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: true, message: "Server Error" });
+    return res.status(500).json({ success: true, message: 'Server Error' });
   }
 });
 
@@ -228,16 +257,16 @@ const verifiedEmailOTP = asyncHandler(async (req, res) => {
     if (!otp) {
       return res
         .status(400)
-        .json({ success: false, message: "Please provide OTP." });
+        .json({ success: false, message: 'Please provide OTP.' });
     }
     const finduser = await User.findOne({ email });
     if (!finduser) {
       return res
         .status(400)
-        .json({ success: false, message: "User not found." });
+        .json({ success: false, message: 'User not found.' });
     }
     if (finduser.otp !== otp || finduser.otpExpire < Date.now()) {
-      return res.status(400).json({ success: false, message: "Invalid OTP" });
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
     }
     // const token = jwt.sign({ id: finduser._id }, process.env.JWT_SECRET, {
     //   expiresIn: "1d",
@@ -248,85 +277,88 @@ const verifiedEmailOTP = asyncHandler(async (req, res) => {
     await finduser.save();
     return res
       .status(200)
-      .json({ success: true, message: "OTP verified successfully" });
+      .json({ success: true, message: 'OTP verified successfully' });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 //reset password
 const resetPassword = asyncHandler(async (req, res) => {
-  const { userId } = getUserData(req.headers);
-  if (!userId) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid or Expired token" });
-  }
+  const user = req.user;
   const { newPassword, confirmNewPassword } = req.body;
   if (!newPassword || !confirmNewPassword) {
     return res
       .status(400)
-      .json({ success: false, message: "Provide a new password" });
+      .json({ success: false, message: 'Provide a new password' });
   }
   try {
     const user = await User.findById({ _id: userId, isOTPVerified: true });
     if (!user) {
       return res
         .status(400)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: 'User not found' });
     }
     if (newPassword !== confirmNewPassword) {
       return res
         .status(400)
-        .json({ success: false, message: "Password does not match" });
+        .json({ success: false, message: 'Password does not match' });
     }
     user.password = await bcrypt.hash(confirmNewPassword, 10);
     user.isResetPasswordVerified = true;
     await user.save();
     return res
       .status(200)
-      .json({ success: true, message: "Password reset successfully" });
+      .json({ success: true, message: 'Password reset successfully' });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
 //logout
 const logout = asyncHandler(async (req, res) => {
   try {
-    const { success, message, userId } = getUserData(req.headers);
+    // Clear the JWT cookie with secure options
+    res.clearCookie('jwt', {
+      httpOnly: true, // Prevents client-side access
+      secure: true, // HTTPS only in production
+      sameSite: 'none', // Allow cross-origin requests - use strict if both are in same domain for CSRF protection
+      path: '/', // Cookie path
+      expires: new Date(0), // Sets expiry to Jan 1, 1970
+    });
 
-    if (!success) {
-      const statusCode = message === "Token has expired " ? 401 : 400;
-      return res.status(statusCode).json({ success: false, message });
-    }
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please Provide token" });
-    }
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(403).json({
-        success: false,
-        message: "User not found. Please log in again",
-      });
-    }
-    // Assuming the token is part of the authorization header
-    const token = req.headers.authorization.split(" ")[1];
-    if (!user.tokens) {
-      user.tokens = [];
-      user.tokens = user.tokens.filter((t) => t.token !== token);
-      await user.save();
-    }
-    return res
-      .status(200)
-      .json({ success: true, message: "Successfully logged out" });
+    return res.status(200).json({
+      success: true,
+      message: 'Logged out successfully',
+    });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    console.error('Logout error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred during logout',
+    });
   }
+});
+
+const getAllAdmin = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  if (user.role !== 'Super_Admin') {
+    return res.status(401).json({
+      success: false,
+      message: `${user.role} is not authorized to get all admin`,
+    });
+  }
+
+  const admin = await User.find();
+  const adminData = admin.map((admin) => {
+    const { password, otp, otpExpire, ...optimisedAdminData } =
+      admin.toObject();
+    return optimisedAdminData;
+  });
+
+  return res.status(200).json({ success: true, adminData });
 });
 
 module.exports = {
@@ -336,4 +368,5 @@ module.exports = {
   resetPassword: resetPassword,
   logout: logout,
   verifiedEmailOTP: verifiedEmailOTP,
+  getAllAdmin,
 };

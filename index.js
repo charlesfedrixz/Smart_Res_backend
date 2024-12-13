@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const http = require('http');
 const express = require('express');
+const app = express();
 const { Server } = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -20,8 +21,7 @@ const {
   updateOrderPaymentBySocket,
 } = require('./controller/orderController');
 const restaurantRoute = require('./routes/restaurantRoute');
-
-const app = express();
+const { checkIfAuthorizedByJWT } = require('./middleware/authenticateJWTToken');
 
 // Middleware
 app.use(express.json());
@@ -32,20 +32,22 @@ app.use(express.static('uploads'));
 // CORS configuration
 app.use(
   cors({
-    origin: '*',
+    origin: ['https://localhost:5173'], // Specify allowed origins
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    // allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-  );
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  next();
-});
+// app.use((req, res, next) => {
+//   res.header('Access-Control-Allow-Origin', '*');
+//   res.header(
+//     'Access-Control-Allow-Headers',
+//     'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+//   );
+//   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+//   next();
+// });
 
 // Increase payload size limits
 // app.use(bodyParser.json({ limit: '100mb' }));
@@ -54,6 +56,7 @@ app.use((req, res, next) => {
 // Database connection
 connectDB();
 
+// protected routes with jwt
 app.use('/api/admin', adminRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/food', foodRoutes);
@@ -63,8 +66,6 @@ app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
 
-
-// Server setup
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {

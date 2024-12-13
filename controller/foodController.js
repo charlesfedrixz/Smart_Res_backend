@@ -1,12 +1,13 @@
-const Food = require("../models/foodModels");
-require("dotenv").config();
-const asyncHandler = require("express-async-handler");
-const getUserData = require("../middleware/authUser");
-const Restaurant = require("../models/restaurantModel");
-const Category = require("../models/categoryModels");
-const cloudinary = require("cloudinary").v2;
-const sharp = require("sharp");
-const User = require("../models/adminModel");
+const Food = require('../models/foodModels');
+require('dotenv').config();
+const asyncHandler = require('express-async-handler');
+const getUserData = require('../middleware/authUser');
+const Restaurant = require('../models/restaurantModel');
+const Category = require('../models/categoryModels');
+const cloudinary = require('cloudinary').v2;
+const sharp = require('sharp');
+const User = require('../models/adminModel');
+const { default: mongoose, mongo } = require('mongoose');
 
 // Configuration
 cloudinary.config({
@@ -17,60 +18,69 @@ cloudinary.config({
 //insert food
 const insertFoodCloud = asyncHandler(async (req, res) => {
   try {
-    const { userId } = getUserData(req.headers);
-    if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User Expired Please log in again" });
-    }
-    const finduser = await User.findById(userId);
-    if (!finduser) {
-      return res.status(404).json({
+    if (
+      req.user.role !== 'Super_Admin' &&
+      req.user.role !== 'Restaurant_Admin'
+    ) {
+      return res.status(403).json({
         success: false,
-        message: "User not found. Please log in again.",
+        message: 'Access denied. Unauthorized role.',
       });
     }
-    if (!["Restaurant_Admin", "Super_Admin"].includes(finduser.role)) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Access denied. Unauthorized role." });
-    }
+
     const { restaurant } = req.params;
-    const findrestaurant = await Restaurant.findOne({ name: restaurant });
-    if (!findrestaurant) {
-      return res.status(404).json({
+
+    if (!mongoose.isValidObjectId(restaurant)) {
+      return res.status(400).json({
         success: false,
-        message: "Restaurant not found.",
+        message: 'Invalid restaurant ID',
       });
     }
-    if (finduser.role !== "Super_Admin") {
-      if (!findrestaurant._id.equals(finduser.restaurant)) {
+
+    const restaurantToUploadTheFood = await Restaurant.findById(restaurant);
+    if (!restaurantToUploadTheFood) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant not found',
+      });
+    }
+
+    if (req.user.role === 'Restaurant_Admin') {
+      if (!restaurantToUploadTheFood._id.equals(req.user.restaurant)) {
         return res.status(404).json({
           success: false,
-          message: "Access denied Restaurant mismatch",
+          message: 'Access denied Restaurant mismatch',
         });
       }
     }
 
-    const { name, description, category, price, subCategory } = req.body;
+    // const finduser = await User.findById(userId);
+    // if (!finduser) {
+    //   return res.status(404).json({
+    //     success: false,
+    //     message: 'User not found. Please log in again.',
+    //   });
+    // }
+
+    const {
+      name,
+      description,
+      category,
+      price,
+      subCategory,
+      taxPercentage,
+      todaysSpecial,
+    } = req.body;
     const image = req.file;
-    if (
-      !name ||
-      !description ||
-      !category ||
-      !subCategory ||
-      !price ||
-      !image ||
-      !restaurant
-    ) {
+    if (!name || !description || !category || !price || !image || !restaurant) {
       return res
         .status(400)
-        .json({ success: false, messagae: "Please provide all the field..." });
+        .json({ success: false, messagae: 'Please provide all the field...' });
     }
 
     //convert image to webp format
     const compressedBuffer = await sharp(image.buffer)
-      .resize({ width: 800, height: 800, fit: "inside" })
+      .resize({ width: 800, height: 800, fit: 'inside' })
       .webp({ quality: 80 })
       .toBuffer();
 
@@ -78,12 +88,12 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
     const cloudinaryUpload = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          resource_type: "image",
-          format: "webp",
+          resource_type: 'image',
+          format: 'webp',
           transformation: [
-            { width: 800, height: 800, crop: "limit" },
-            { quality: "auto" },
-            { fetch_format: "auto" },
+            { width: 800, height: 800, crop: 'limit' },
+            { quality: 'auto' },
+            { fetch_format: 'auto' },
           ],
         },
         (error, result) => {
@@ -100,22 +110,30 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
     if (!cloudinaryUpload) {
       return res
         .status(400)
-        .json({ success: false, message: "Error in uploading image." });
+        .json({ success: false, message: 'Error in uploading image.' });
     }
     //find category
-    const findCategory = await Category.findOne({ category });
+    if (!mongoose.isValidObjectId(category)) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid category ID' });
+    }
+
+    const findCategory = await Category.findById(category);
     if (!findCategory) {
       return res
         .status(400)
-        .json({ success: false, message: "Category not found" });
+        .json({ success: false, message: 'Category not found' });
     }
 
     //find subcategory
-    const subcategories = findCategory.subcategory.includes(subCategory);
-    if (!subcategories) {
-      return res
-        .status(400)
-        .json({ success: false, message: `${subCategory} not found` });
+    if (subCategory) {
+      const subcategories = findCategory.subcategory.includes(subCategory);
+      if (!subcategories) {
+        return res
+          .status(400)
+          .json({ success: false, message: `${subCategory} not found` });
+      }
     }
 
     // Create new food entry with the image URL from Cloudinary
@@ -123,138 +141,189 @@ const insertFoodCloud = asyncHandler(async (req, res) => {
       name,
       description,
       category: findCategory._id,
-      subcategory: subcategories,
+      subcategory: subCategory || '',
       price,
-      restaurant: findrestaurant._id,
+      restaurant: restaurantToUploadTheFood._id,
       image: cloudinaryUpload.secure_url,
-      publicId: cloudinaryUpload.public_id, // Use the secure URL from Cloudinary
-      user: userId, // Assuming userId refers to the admin or the creator of the food item
+      user: req.user._id, // Assuming userId refers to the admin or the creator of the food item
+      taxPercentage: taxPercentage || 0,
+      todaysSpecial: todaysSpecial || false,
     });
     // Send success response
     return res
       .status(200)
-      .json({ success: true, newFood, message: "Food uploaded successfully" });
+      .json({ success: true, newFood, message: 'Food uploaded successfully' });
   } catch (error) {
-    console.error("Error uploading food:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    console.error('Error uploading food:', error);
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
 //delete food
 const deleteFood = async (req, res) => {
   try {
-    const { userId, success, message } = getUserData(req.headers);
-    const { id } = req.body;
-    if (!userId) {
+    if (
+      req.user.role !== 'Super_Admin' &&
+      req.user.role !== 'Restaurant_Admin'
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Unauthorized role.',
+      });
+    }
+    const { restaurantId, foodId } = req.params;
+    if (
+      !mongoose.isValidObjectId(restaurantId) ||
+      !mongoose.isValidObjectId(foodId)
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid ID' });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
       return res
-        .status(403)
-        .json({ success: false, message: "User Expired Please log in again" });
+        .status(404)
+        .json({ success: false, message: 'Restaurant not found' });
     }
-    if (!success) {
-      const statusCode = message === "Token has expired " ? 401 : 400;
-      return res.status(statusCode).json({ success: false, message });
-    }
-    if (!id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide Food_id..." });
-    }
-    const food = await Food.findById(id);
-    if (!food) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Food is not found..." });
-    }
-    const publicID = food.publicId;
-    if (publicID) {
-      const result = await cloudinary.uploader.destroy(publicID);
-      if (result.result !== "ok") {
-        return res.status(500).json({
+
+    if (req.user.role === 'Restaurant_Admin') {
+      if (!restaurant._id.equals(req.user.restaurant)) {
+        return res.status(404).json({
           success: false,
-          message: "Failed to delete image from Cloudinary",
+          message: 'Access denied Restaurant mismatch',
         });
       }
-      await Food.findByIdAndDelete(id);
+    }
+
+    const foodToBeDeleted = await Food.findById(foodId);
+    if (!foodToBeDeleted) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Food not found' });
+    }
+
+    // image link format = https://res.cloudinary.com/dxx6zqz6y/image/upload/v1718288888/food/food_image_public_id.webp
+    const publicID = foodToBeDeleted.image.split('/').pop().split('.').shift();
+    if (publicID) {
+      const result = await cloudinary.uploader.destroy(publicID);
+      if (result.result !== 'ok') {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to delete image from Cloudinary',
+        });
+      }
+      await Food.findByIdAndDelete(foodId);
       return res
         .status(200)
-        .json({ success: true, message: "Food removed successfully..." });
-    } else {
-      return res
-        .status(400)
-        .json({ success: false, message: "No image found for this food item" });
+        .json({ success: true, message: 'Food removed successfully...' });
     }
+    return res
+      .status(400)
+      .json({ success: false, message: 'No image found for this food item' });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 //list food
 const listFood = async (req, res) => {
   try {
     const { restaurant } = req.params;
-    const findrestaurant = await Restaurant.findOne({ name: restaurant });
+
+    // get all food
+    if (restaurant === 'null') {
+      const foods = await Food.find();
+      return res.status(200).json({
+        success: true,
+        data: foods || [],
+        message: 'Foods fetched successfully.',
+      });
+    }
+
+    if (!mongoose.isValidObjectId(restaurant)) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid restaurant ID' });
+    }
+
+    const findrestaurant = await Restaurant.findById(restaurant);
     if (!findrestaurant) {
       return res
         .status(400)
-        .json({ success: false, message: "Restaurant not found..." });
+        .json({ success: false, message: 'Restaurant not found...' });
     }
 
-    const foods = await Food.find({ restaurant: findrestaurant._id });
-    if (!foods || foods.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No food found for this restaurant.",
-      });
-    }
+    // * get all food of the restaurant
+    const foods = await Food.find({ restaurant });
+
     return res.status(200).json({
       success: true,
-      Data: foods,
-      message: "Foods fetched successfully.",
+      data: foods || [],
+      message: 'Foods fetched successfully.',
     });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 //edit food
 const editFood = async (req, res) => {
   try {
-    const { userId, success, message } = getUserData(req.headers);
-    const { id } = req.params;
-    const { name, description, category, price, publicId } = req.body; // New values
+    if (
+      req.user.role !== 'Super_Admin' &&
+      req.user.role !== 'Restaurant_Admin'
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Unauthorized role.',
+      });
+    }
+    const { restaurantId, foodId } = req.params;
+
+    if (
+      !mongoose.isValidObjectId(restaurantId) ||
+      !mongoose.isValidObjectId(foodId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Restaurant ID or Food ID',
+      });
+    }
+
+    const {
+      name,
+      description,
+      category,
+      price,
+      subCategory,
+      taxPercentage,
+      taxAmount,
+      todaysSpecial,
+      discountPrice,
+      discountPercentage,
+      isAvailable,
+    } = req.body; // New values
     const image = req.file; // New image if uploaded
 
-    // Check if user is authenticated
-    if (!userId) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Token Error. Please log in again." });
-    }
-
-    // Check for token success
-    if (!success) {
-      const statusCode = message === "Token has expired" ? 401 : 400;
-      return res.status(statusCode).json({ success: false, message });
-    }
-
-    // Check if food ID is provided
-    if (!id) {
+    if (!name || !description || !category || !price) {
       return res
         .status(400)
-        .json({ success: false, message: "Please provide Food ID..." });
+        .json({ success: false, message: 'Please provide ll fields' });
     }
-    if (!name || !description || !category || !price || !publicId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide ll fields" });
+
+    if (!mongoose.isValidObjectId(category)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category ID',
+      });
     }
 
     // Find the food item in the database
-    const food = await Food.findById(id);
+    const food = await Food.findById(foodId);
     if (!food) {
       return res
         .status(400)
-        .json({ success: false, message: "Food item not found..." });
+        .json({ success: false, message: 'Food item not found...' });
     }
 
     // Update the food item fields
@@ -262,22 +331,30 @@ const editFood = async (req, res) => {
     food.description = description || food.description;
     food.category = category || food.category;
     food.price = price || food.price;
+    food.subcategory = subCategory || food.subcategory;
+    food.taxPercentage = taxPercentage || food.taxPercentage;
+    food.taxAmount = taxAmount || food.taxAmount;
+    food.todaysSpecial = todaysSpecial || food.todaysSpecial;
+    food.discountPrice = discountPrice || food.discountPrice;
+    food.discountPercentage = discountPercentage || food.discountPercentage;
+    food.isAvailable = isAvailable || food.isAvailable;
 
     // If a new image is provided, handle the image upload
     if (image) {
+      const publicId = food.image.split('/').pop().split('.').shift();
       if (publicId) {
         // Delete the old image from Cloudinary
         const result = await cloudinary.uploader.destroy(publicId);
-        if (result.result !== "ok") {
+        if (result.result !== 'ok') {
           return res.status(500).json({
             success: false,
-            message: "Failed to delete old image from Cloudinary",
+            message: 'Failed to delete old image from Cloudinary',
           });
         }
         // Upload new image to Cloudinary
         const cloudinaryUpload = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
-            { resource_type: "image" },
+            { resource_type: 'image' },
             (error, result) => {
               if (error) {
                 reject(error);
@@ -288,29 +365,27 @@ const editFood = async (req, res) => {
           );
 
           // Stream the file to Cloudinary
-          if (image && image.buffer) {
+          if (image?.buffer) {
             uploadStream.end(image.buffer);
           } else {
-            reject(new Error("Image upload failed"));
+            reject(new Error('Image upload failed'));
           }
         });
 
         // Update the food item's image URL and public ID
         food.image = cloudinaryUpload.secure_url; // Update the URL
-        food.publicId = cloudinaryUpload.public_id; // Store the new public ID
       }
-    } else {
-      food.publicId = food.publicId; // This line ensures publicId isn't undefined
     }
+
     await food.save();
     return res
       .status(200)
-      .json({ success: true, food, message: "Food item updated successfully" });
+      .json({ success: true, food, message: 'Food item updated successfully' });
   } catch (error) {
-    console.error("Error updating food:", error);
+    console.error('Error updating food:', error);
     return res.status(500).json({
       success: false,
-      message: "Server error. Please try again later.",
+      message: 'Server error. Please try again later.',
     });
   }
 };
@@ -318,13 +393,13 @@ const editFood = async (req, res) => {
 //list food by category
 const getFoodByCategory = async (req, res) => {
   try {
-    const defaultCategory = "ChaBora 1902"; // Assuming the category is passed as a query parameter
+    const defaultCategory = 'ChaBora 1902'; // Assuming the category is passed as a query parameter
 
     const foodItems = await Food.find({ category: defaultCategory });
     if (!foodItems || foodItems.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Category is not fouond in the food list...",
+        message: 'Category is not fouond in the food list...',
       });
     }
     return res.status(200).json({
@@ -333,14 +408,14 @@ const getFoodByCategory = async (req, res) => {
       message: `${defaultCategory} category is listed...`,
     });
   } catch (error) {
-    return res.status(500).json({ success: false, messagae: "Server Error" });
+    return res.status(500).json({ success: false, messagae: 'Server Error' });
   }
 };
 
 const getFoodByCategory1 = async (req, res) => {
   try {
     // Default category
-    const defaultCategory = "RoofTop Cafe";
+    const defaultCategory = 'RoofTop Cafe';
 
     // Fetch food items by the default category
     const foodItems = await Food.find({ category: defaultCategory });
@@ -358,8 +433,8 @@ const getFoodByCategory1 = async (req, res) => {
       message: `${defaultCategory} category food items listed successfully.`,
     });
   } catch (error) {
-    console.error("Error fetching food items:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    console.error('Error fetching food items:', error);
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 
@@ -367,46 +442,58 @@ const searchFood = async (req, res) => {
   try {
     const { foodName } = req.query;
 
-    // Check if foodName is provided
     if (!foodName) {
-      return res.status(400).json({
-        success: false,
-        food: [],
-        message: "Provide a food name",
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: 'Provide a food name',
       });
     }
 
-    const alphabetPattern = foodName
-      .split("") // Split each character
-      .map((char) => `(?=.*${char})`) // Ensure each character is present
-      .join("");
+    // Create a regex pattern that matches words starting with the search term
+    const exactStartPattern = new RegExp(`^${foodName}`, 'i');
 
-    // Create a regex pattern for fuzzy search (matching any substring case-insensitively)
-    const regexPattern = new RegExp(alphabetPattern, "i");
-    // Perform the search using the regex pattern
-    const food = await Food.find({
-      name: { $regex: regexPattern }, // Removed $options since regexPattern already includes 'i'
+    // Also create a pattern for partial matches anywhere in the name
+    const partialPattern = new RegExp(foodName, 'i');
+
+    // First try to find foods that start with the search term
+    let food = await Food.find({
+      name: { $regex: exactStartPattern },
     });
 
-    // If food array is empty, perform a partial match search
+    // If no exact start matches, look for partial matches
     if (food.length === 0) {
-      return res.status(404).json({
-        success: false,
-        food: [],
-        message: "Food is not found",
+      food = await Food.find({
+        name: { $regex: partialPattern },
+      });
+    }
+
+    // If still no matches, try fuzzy search as last resort
+    if (food.length === 0) {
+      const fuzzyPattern = foodName
+        .split('')
+        // Creates a regex pattern that matches strings containing all characters
+        // For example, if searching for "cat":
+        // (?=.*c)(?=.*a)(?=.*t) will match any string containing c, a, and t in any order
+        // This allows for fuzzy matching where characters can be in different positions
+        .map((char) => `(?=.*${char})`)
+        .join('');
+
+      food = await Food.find({
+        name: { $regex: new RegExp(fuzzyPattern, 'i') },
       });
     }
     // Return the found food items for exact search
     return res.status(200).json({
       success: true,
-      food,
-      message: "Food is here...",
+      food: food || [],
+      message: 'Food is here...',
     });
   } catch (error) {
-    console.error("Server Error:", error);
+    console.error('Server Error:', error);
     return res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: 'Server Error',
     });
   }
 };
