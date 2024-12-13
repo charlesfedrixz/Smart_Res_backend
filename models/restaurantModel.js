@@ -1,6 +1,4 @@
-
 const mongoose = require('mongoose');
-
 
 const restaurantSchema = new mongoose.Schema(
   {
@@ -13,7 +11,6 @@ const restaurantSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
     },
     description: {
       type: String,
@@ -25,20 +22,17 @@ const restaurantSchema = new mongoose.Schema(
     },
     coverImage: {
       type: String,
-
     },
     contact: {
       email: {
         type: String,
         required: true,
-        match: [/^\S+@(gmail\.com|org\.in|gov\.in|edu\.in|example\.org)$/],
       },
       phone: {
         type: String,
         required: true,
 
         match: [/^[6-9]\d{9}$/, 'Phone number must be Indian number 10 digits'],
-
       },
       address: {
         type: String,
@@ -54,7 +48,6 @@ const restaurantSchema = new mongoose.Schema(
         type: Number,
         default: 1,
         min: [1, 'minimum order must be at least 1'],
-
       },
       taxPercentage: {
         type: Number,
@@ -62,13 +55,11 @@ const restaurantSchema = new mongoose.Schema(
 
         min: [0, 'Tax percentage cannot be negative'],
         max: [100, 'Tax percentage cannot exceed 100%'],
-
       },
     },
   },
   { timestamps: true }
 );
-
 
 const Restaurant = mongoose.model('Restaurant', restaurantSchema);
 
