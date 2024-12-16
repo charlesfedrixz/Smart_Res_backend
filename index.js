@@ -22,6 +22,7 @@ const {
 } = require('./controller/orderController');
 const restaurantRoute = require('./routes/restaurantRoute');
 const { checkIfAuthorizedByJWT } = require('./middleware/authenticateJWTToken');
+const { errorHandler } = require('./utils/errorHandler');
 
 // Middleware
 app.use(express.json());
@@ -39,21 +40,6 @@ app.use(
   })
 );
 
-// app.use((req, res, next) => {
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header(
-//     'Access-Control-Allow-Headers',
-//     'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-//   );
-//   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-//   next();
-// });
-
-// Increase payload size limits
-// app.use(bodyParser.json({ limit: '100mb' }));
-// app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
-
-// Database connection
 connectDB();
 
 // protected routes with jwt
@@ -65,6 +51,9 @@ app.use('/api/order', orderRoutes.order);
 app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
+
+// To handle all the errors
+app.use(errorHandler);
 
 const server = http.createServer(app);
 const io = new Server(server, {

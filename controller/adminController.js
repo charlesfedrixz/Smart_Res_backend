@@ -361,6 +361,122 @@ const getAllAdmin = asyncHandler(async (req, res) => {
   return res.status(200).json({ success: true, adminData });
 });
 
+const getPermissions = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (req.user.role !== 'Super_Admin' && req.user.role !== 'Restaurant_Admin') {
+    return res.status(401).json({
+      success: false,
+      message: `${req.user.role} is not authorized to get permissions`,
+    });
+  }
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid user ID format',
+    });
+  }
+
+  console.log(userId);
+
+  const admin = await User.findById(userId);
+  return res
+    .status(200)
+    .json({ success: true, permissions: admin.permissions });
+});
+
+const addPermissions = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'Super_Admin') {
+    return res.status(401).json({
+      success: false,
+      message: `${req.user.role} is not authorized to add permissions`,
+    });
+  }
+  const { userId } = req.params;
+  const { permissions } = req.body;
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid user ID format',
+    });
+  }
+
+  const admin = await User.findById(userId);
+  admin.permissions.push(...permissions);
+  await admin.save();
+
+  return res.status(200).json({ success: true, message: 'Permissions added' });
+});
+
+const deletePermissions = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'Super_Admin') {
+    return res.status(401).json({
+      success: false,
+      message: `${req.user.role} is not authorized to delete permissions`,
+    });
+  }
+
+  const { userId } = req.params;
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid permission ID format',
+    });
+  }
+  const { permissionIds } = req.body;
+
+  console.log(userId, permissionIds);
+
+  const adminToBeUpdated = await User.findById(userId);
+  adminToBeUpdated.permissions = adminToBeUpdated.permissions.filter(
+    (permission) => !permissionIds.includes(permission._id.toString())
+  );
+
+  console.log(adminToBeUpdated.permissions);
+  await adminToBeUpdated.save();
+  return res
+    .status(200)
+    .json({ success: true, message: 'Permissions deleted' });
+});
+
+const updatePermissions = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (req.user.role !== 'Super_Admin') {
+    return res.status(401).json({
+      success: false,
+      message: `${req.user.role} is not authorized to update permissions`,
+    });
+  }
+
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid permission ID format',
+    });
+  }
+
+  const { permissions } = req.body;
+  const adminToBeUpdated = await User.findById(userId);
+  adminToBeUpdated.permissions = permissions;
+  await adminToBeUpdated.save();
+  return res
+    .status(200)
+    .json({ success: true, message: 'Permissions updated' });
+});
+
+const getAdmin = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!mongoose.isValidObjectId(userId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid user ID format',
+    });
+  }
+  const admin = await User.findById(userId);
+  const { password, otp, otpExpire, ...optimisedAdminData } = admin.toObject();
+  return res.status(200).json({ success: true, admin: optimisedAdminData });
+});
+
 module.exports = {
   createUser: createUser,
   login: login,
@@ -369,4 +485,9 @@ module.exports = {
   logout: logout,
   verifiedEmailOTP: verifiedEmailOTP,
   getAllAdmin,
+  getPermissions,
+  addPermissions,
+  deletePermissions,
+  updatePermissions,
+  getAdmin,
 };
