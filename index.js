@@ -33,7 +33,7 @@ app.use(express.static('uploads'));
 // CORS configuration
 app.use(
   cors({
-    origin: ['https://localhost:5173'], // Specify allowed origins
+    origin: ['https://localhost:5173', 'https://localhost:5175'], // Specify allowed origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     // allowedHeaders: ['Content-Type', 'Authorization'],

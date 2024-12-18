@@ -319,13 +319,14 @@ const resetPassword = asyncHandler(async (req, res) => {
 //logout
 const logout = asyncHandler(async (req, res) => {
   try {
-    // Clear the JWT cookie with secure options
-    res.clearCookie('jwt', {
+    // Clear the JWT cookie by setting an expired cookie
+    res.cookie('jwt', '', {
       httpOnly: true, // Prevents client-side access
       secure: true, // HTTPS only in production
       sameSite: 'none', // Allow cross-origin requests - use strict if both are in same domain for CSRF protection
       path: '/', // Cookie path
       expires: new Date(0), // Sets expiry to Jan 1, 1970
+      maxAge: 0, // Alternative way to expire immediately
     });
 
     return res.status(200).json({

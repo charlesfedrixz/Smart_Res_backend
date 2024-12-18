@@ -7,6 +7,8 @@ const {
   insertFoodCloud,
   deleteFood,
   getFoodByCategory1,
+  getFoodById,
+  getFoodByCategoryAndSubcategory,
 } = require('../controller/foodController');
 const multer = require('multer');
 const { authenticateJWTToken } = require('../middleware/authenticateJWTToken');
@@ -46,6 +48,15 @@ foodRoutes.post(
   authenticateJWTToken,
   upload.single('image'),
   insertFoodCloud
+);
+
+// * GET Food by id from restaurant
+foodRoutes.get('/getFood/:restaurantId/:foodId', getFoodById);
+
+// * GET Food by category and subcategory from restaurant
+foodRoutes.get(
+  '/getFood/:restaurantId/:category/:subcategory',
+  getFoodByCategoryAndSubcategory
 );
 
 module.exports = { foodRoutes: foodRoutes };

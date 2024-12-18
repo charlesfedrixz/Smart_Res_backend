@@ -396,10 +396,24 @@ const getRestaurantById = asyncHandler(async (req, res) => {
   });
 });
 
+// get restaurant by slug
+const getRestaurantBySlug = asyncHandler(async (req, res) => {
+  const { slug } = req.params;
+  console.log(slug);
+  const restaurant = await Restaurant.findOne({ slug });
+  if (!restaurant) {
+    res.statusCode = 404;
+    throw new Error('Restaurant not found');
+  }
+  console.log(restaurant);
+  return res.status(200).json({ success: true, restaurant });
+});
+
 module.exports = {
   create,
   deleted,
   edit,
   fetch,
   getRestaurantById,
+  getRestaurantBySlug,
 };
