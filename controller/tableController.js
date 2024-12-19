@@ -33,7 +33,7 @@ const createTable = asyncHandler(async (req, res) => {
     }
 
     // Generate QR code
-    const qrData = `${process.env.FRONTEND_URL}/${restaurant.slug}/table/${tableNumber}`;
+    const qrData = `${process.env.FRONTEND_URL}/${restaurant.slug}/${tableNumber}`;
     let qrCode;
     try {
       qrCode = await QRCode.toDataURL(qrData);
@@ -115,21 +115,27 @@ const getAllTables = asyncHandler(async (req, res) => {
 // Get available tables
 const getAvailableTables = asyncHandler(async (req, res) => {
   try {
-    const { restaurantId } = req.params;
+    const { restaurantSlug } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+    if (!restaurantSlug) {
       return res.status(400).json({
         success: false,
         message: 'Invalid restaurant ID format',
       });
     }
 
+    const restaurant = await Restaurant.findOne({ slug: restaurantSlug });
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant not found',
+      });
+    }
     const tables = await Table.find({
-      restaurantId,
-      isOccupied: false,
-      isReserved: false,
-      status: 'Active',
-    }).lean();
+      restaurantId: restaurant._id,
+    })
+      .populate('restaurantId')
+      .lean();
 
     res.status(200).json({
       success: true,

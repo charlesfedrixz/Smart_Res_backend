@@ -23,11 +23,7 @@ tableRouter.post('/:restaurantId/table', authenticateJWTToken, createTable);
 tableRouter.get('/:restaurantId/tables', authenticateJWTToken, getAllTables);
 
 // Get available tables for a restaurant
-tableRouter.get(
-  '/:restaurantId/available-tables',
-  authenticateJWTToken,
-  getAvailableTables
-);
+tableRouter.get('/:restaurantSlug/available-tables', getAvailableTables);
 
 // Get specific table by ID
 tableRouter.get(
