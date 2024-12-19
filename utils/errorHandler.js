@@ -10,7 +10,7 @@ const errorHandler = (err, req, res, next) => {
   });
 
   // Determine error status code
-  const statusCode = err.statusCode || 500;
+  const statusCode = res.statusCode || 500;
 
   // Prepare error response
   const errorResponse = {

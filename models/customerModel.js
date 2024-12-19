@@ -1,37 +1,52 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 const customerSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
+    restaurantId: {
+      type: mongoose.Types.ObjectId,
+      ref: 'Restaurant',
       required: true,
     },
-    currentTableNumber: {
-      type: Number,
+    name: {
+      type: String,
+    },
+    tableId: {
+      type: mongoose.Types.ObjectId,
+      ref: 'Table',
       required: true,
-      min: [1, "Table number must be at least 1"],
-      max: [100, "Table number cannot exceed 100"],
     },
     mobileNumber: {
       type: Number,
       required: true,
       unique: true,
       validate: {
-        validator: function (value) {
-          const regex = /^[6-9]\d{9}$/;
-          return regex.test(value);
+        validator: (value) => {
+          // Check if value is a number
+          if (typeof value !== 'number') return false;
+
+          // Convert to string for validation
+          const mobileStr = value.toString();
+
+          // Check length is exactly 10 digits
+          if (mobileStr.length !== 10) return false;
+
+          // Check first digit is between 6-9
+          if (!/^[6-9]/.test(mobileStr)) return false;
+
+          // Check all characters are digits
+          if (!/^\d+$/.test(mobileStr)) return false;
+
+          return true;
         },
       },
     },
-    restaurant: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Restaurant",
-      required: true,
-    },
-    guest: {
+    numberOfGuests: {
       type: Number,
-      required: true,
       default: 1,
-      min: [1, "The number of guests must be at least 1 "],
+      min: [1, 'The number of guests must be at least 1 '],
+    },
+    visitCount: {
+      type: Number,
+      default: 0,
     },
     otp: {
       type: String,
@@ -51,6 +66,6 @@ const customerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const customer = mongoose.model("Customers", customerSchema);
+const customer = mongoose.model('Customers', customerSchema);
 
 module.exports = customer;

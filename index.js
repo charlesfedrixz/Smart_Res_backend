@@ -23,6 +23,7 @@ const {
 const restaurantRoute = require('./routes/restaurantRoute');
 const { checkIfAuthorizedByJWT } = require('./middleware/authenticateJWTToken');
 const { errorHandler } = require('./utils/errorHandler');
+const tableRouter = require('./routes/tableRoutes');
 
 // Middleware
 app.use(express.json());
@@ -33,7 +34,12 @@ app.use(express.static('uploads'));
 // CORS configuration
 app.use(
   cors({
-    origin: ['https://localhost:5173'], // Specify allowed origins
+    origin: [
+      'https://localhost:5173',
+      'https://localhost:5175',
+      'https://achaathak.com',
+      'https://www.achaathak.com',
+    ], // Specify allowed origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     // allowedHeaders: ['Content-Type', 'Authorization'],
@@ -51,6 +57,7 @@ app.use('/api/order', orderRoutes.order);
 app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
+app.use('/api/table', tableRouter);
 
 // To handle all the errors
 app.use(errorHandler);
@@ -67,6 +74,8 @@ const io = new Server(server, {
   transports: ['websocket', 'polling'],
   secure: true,
 });
+
+app.set('io', io);
 
 // Socket.IO event handlers
 io.on('connection', (socket) => {

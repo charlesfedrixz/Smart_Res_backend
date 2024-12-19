@@ -497,6 +497,62 @@ const searchFood = async (req, res) => {
     });
   }
 };
+// GET Food by id
+const getFoodById = asyncHandler(async (req, res) => {
+  const { restaurantId, foodId } = req.params;
+  if (
+    !mongoose.isValidObjectId(restaurantId) ||
+    !mongoose.isValidObjectId(foodId)
+  ) {
+    res.statusCode = 400;
+    throw new Error('Invalid Restaurant ID or Food ID');
+  }
+
+  const food = await Food.findOne({ _id: foodId, restaurant: restaurantId });
+
+  if (!food) {
+    res.statusCode = 404;
+    throw new Error('Food not found');
+  }
+
+  return res.status(200).json({ success: true, food });
+});
+
+// GET Food by category and subcategory from restaurant
+const getFoodByCategoryAndSubcategory = asyncHandler(async (req, res) => {
+  const { restaurantId, category, subcategory } = req.params;
+  if (!mongoose.isValidObjectId(restaurantId)) {
+    res.statusCode = 400;
+    throw new Error('Invalid Restaurant ID');
+  }
+
+  if (category === 'null' || !category) {
+    const food = await Food.find({
+      restaurant: restaurantId,
+    });
+    return res.status(200).json({ success: true, food });
+  }
+
+  if (subcategory === 'null' || !subcategory) {
+    const food = await Food.find({
+      restaurant: restaurantId,
+      category,
+    });
+    return res.status(200).json({ success: true, food });
+  }
+
+  if (!mongoose.isValidObjectId(category)) {
+    res.statusCode = 400;
+    throw new Error('Invalid Category ID');
+  }
+
+  const food = await Food.find({
+    restaurant: restaurantId,
+    category,
+    subcategory,
+  });
+  return res.status(200).json({ success: true, food });
+});
 
 module.exports = {
   listFood,
@@ -506,4 +562,6 @@ module.exports = {
   editFood,
   insertFoodCloud,
   deleteFood,
+  getFoodById,
+  getFoodByCategoryAndSubcategory,
 };

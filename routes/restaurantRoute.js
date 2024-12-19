@@ -7,6 +7,7 @@ const {
   edit,
   fetch,
   getRestaurantById,
+  getRestaurantBySlug,
 } = require('../controller/restaurantController');
 const { authenticateJWTToken } = require('../middleware/authenticateJWTToken');
 const restaurantRoute = express.Router();
@@ -50,5 +51,8 @@ restaurantRoute.get(
   authenticateJWTToken,
   getRestaurantById
 );
+
+// get restaurant by slug
+restaurantRoute.get('/getBySlug/:slug', getRestaurantBySlug);
 
 module.exports = restaurantRoute;
