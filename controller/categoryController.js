@@ -186,7 +186,7 @@ const getCategory = asynchandler(async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      category: category || [],
+      categories: category || [],
       message: 'Listed categories for the restaurant successfully.',
     });
   } catch (error) {

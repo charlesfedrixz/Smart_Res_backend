@@ -520,13 +520,30 @@ const getFoodById = asyncHandler(async (req, res) => {
 
 // GET Food by category and subcategory from restaurant
 const getFoodByCategoryAndSubcategory = asyncHandler(async (req, res) => {
-  const { restaurantId, category, subcategory = '' } = req.params;
-  if (
-    !mongoose.isValidObjectId(restaurantId) ||
-    !mongoose.isValidObjectId(category)
-  ) {
+  const { restaurantId, category, subcategory } = req.params;
+  if (!mongoose.isValidObjectId(restaurantId)) {
     res.statusCode = 400;
-    throw new Error('Invalid Restaurant ID or Category or Subcategory');
+    throw new Error('Invalid Restaurant ID');
+  }
+
+  if (category === 'null' || !category) {
+    const food = await Food.find({
+      restaurant: restaurantId,
+    });
+    return res.status(200).json({ success: true, food });
+  }
+
+  if (subcategory === 'null' || !subcategory) {
+    const food = await Food.find({
+      restaurant: restaurantId,
+      category,
+    });
+    return res.status(200).json({ success: true, food });
+  }
+
+  if (!mongoose.isValidObjectId(category)) {
+    res.statusCode = 400;
+    throw new Error('Invalid Category ID');
   }
 
   const food = await Food.find({

@@ -23,6 +23,7 @@ const {
 const restaurantRoute = require('./routes/restaurantRoute');
 const { checkIfAuthorizedByJWT } = require('./middleware/authenticateJWTToken');
 const { errorHandler } = require('./utils/errorHandler');
+const tableRouter = require('./routes/tableRoutes');
 
 // Middleware
 app.use(express.json());
@@ -51,6 +52,7 @@ app.use('/api/order', orderRoutes.order);
 app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
+app.use('/api/table', tableRouter);
 
 // To handle all the errors
 app.use(errorHandler);
@@ -67,6 +69,8 @@ const io = new Server(server, {
   transports: ['websocket', 'polling'],
   secure: true,
 });
+
+app.set('io', io);
 
 // Socket.IO event handlers
 io.on('connection', (socket) => {

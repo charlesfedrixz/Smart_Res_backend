@@ -234,7 +234,7 @@ const edit = asyncHandler(async (req, res) => {
     const {
       newName,
       newEmail,
-      // newSlug,
+      newSlug,
       newdescription,
       newphone,
       newAddress,
@@ -247,7 +247,7 @@ const edit = asyncHandler(async (req, res) => {
     if (
       !newName ||
       !newEmail ||
-      // !newSlug ||
+      !newSlug ||
       !newdescription ||
       !newphone ||
       !newAddress ||
@@ -260,16 +260,16 @@ const edit = asyncHandler(async (req, res) => {
 
     const updateFields = {};
     if (newName !== restaurant.name) updateFields.name = newName;
-    // if (newSlug !== restaurant.slug) updateFields.slug = newSlug;
+    if (newSlug !== restaurant.slug) updateFields.slug = newSlug;
     if (newdescription !== restaurant.description)
       updateFields.description = newdescription;
-    if (newEmail !== restaurant.email)
+    if (newEmail !== restaurant.contact.email)
       updateFields.contact = { ...restaurant.contact, email: newEmail };
-    if (newphone !== restaurant.phone)
+    if (newphone !== restaurant.contact.phone)
       updateFields.contact = { ...restaurant.contact, phone: newphone };
-    if (newAddress !== restaurant.address)
+    if (newAddress !== restaurant.contact.address)
       updateFields.contact = { ...restaurant.contact, address: newAddress };
-    if (newTaxpercentage !== restaurant.taxPercentage)
+    if (newTaxpercentage !== restaurant.settings.taxPercentage)
       updateFields.settings = {
         ...restaurant.settings,
         taxPercentage: newTaxpercentage,

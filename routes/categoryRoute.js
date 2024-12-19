@@ -39,7 +39,7 @@ categoryRouter.delete(
   removeSubcategory
 ); // header token, params categoryid and subcategoryid
 categoryRouter.put(
-  '/update/:restaurantId/:categoryId',
+  '/update/category/:restaurantId/:categoryId',
   authenticateJWTToken,
   updateCategory
 ); // header token, body category and restaurant
