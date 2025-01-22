@@ -33,7 +33,9 @@ const createTable = asyncHandler(async (req, res) => {
     }
 
     // Generate QR code
-    const qrData = `${process.env.FRONTEND_URL}/${restaurant.slug}/${tableNumber}`;
+    const qrData = `${req.protocol}://${req.get('host')}/restaurant/${
+      restaurant.slug
+    }/${tableNumber}`;
     let qrCode;
     try {
       qrCode = await QRCode.toDataURL(qrData);
@@ -453,6 +455,41 @@ const getTableByTableNumber = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: table });
 });
 
+const deleteTableByTableNumber = asyncHandler(async (req, res) => {
+  const { tableNumber, restaurantId } = req.params;
+  const table = await Table.findOneAndDelete({ tableNumber, restaurantId });
+  res.status(200).json({ success: true, data: table });
+});
+
+// delete all table of a restaurant
+const deleteAllTableOfRestaurant = asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  const table = await Table.deleteMany({ restaurantId });
+  res.status(200).json({ success: true, data: table });
+});
+
+// update table occupancy by table number and restaurantSlug
+const updateTableOccupancyByTableNumber = asyncHandler(async (req, res) => {
+  const { tableNumber, restaurantSlug } = req.params;
+  const { isOccupied } = req.body;
+
+  console.log(tableNumber, restaurantSlug);
+
+  const restaurant = await Restaurant.findOne({ slug: restaurantSlug });
+  if (!restaurant) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Restaurant not found' });
+  }
+
+  console.log(restaurant._id);
+  const table = await Table.findOneAndUpdate(
+    { tableNumber, restaurantId: restaurant._id },
+    { isOccupied }
+  );
+  res.status(200).json({ success: true, data: table });
+});
+
 module.exports = {
   createTable,
   getAllTables,
@@ -465,4 +502,7 @@ module.exports = {
   deleteTable,
   getAllTablesForAllRestaurants,
   getTableByTableNumber,
+  deleteTableByTableNumber,
+  deleteAllTableOfRestaurant,
+  updateTableOccupancyByTableNumber,
 };

@@ -195,10 +195,8 @@ const edit = asyncHandler(async (req, res) => {
       req.user.role !== 'Super_Admin' &&
       req.user.role !== 'Restaurant_Admin'
     ) {
-      return res.status(401).json({
-        success: false,
-        message: `${req.user.role} is not authorized`,
-      });
+      res.statusCode = 401;
+      throw new Error(`${req.user.role} is not authorized`);
     }
     const { restaurantId } = req.params;
 

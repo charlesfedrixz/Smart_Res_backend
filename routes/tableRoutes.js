@@ -12,7 +12,13 @@ const {
   getAvailableTables,
   getAllTablesForAllRestaurants,
   getTableByTableNumber,
+  deleteAllTableOfRestaurant,
+  deleteTableByTableNumber,
+  updateTableOccupancyByTableNumber,
 } = require('../controller/tableController');
+const {
+  authenticateJWTTokenCustomer,
+} = require('../middleware/authenticateJWTTokenCustomer');
 
 const tableRouter = express.Router();
 
@@ -38,6 +44,20 @@ tableRouter.get(
 // Example: data%3Aimage%2Fpng%3Bbase64%2CiVBORw0...
 tableRouter.get('/table/qr/:qrCode', getTableByQR);
 
+// delete all table of a restaurant
+tableRouter.delete(
+  '/:restaurantId/tables',
+  authenticateJWTToken,
+  deleteAllTableOfRestaurant
+);
+
+// delete table by table number
+tableRouter.delete(
+  '/:restaurantId/table/:tableNumber',
+  authenticateJWTToken,
+  deleteTableByTableNumber
+);
+
 // Update table details
 tableRouter.put(
   '/:restaurantId/table/:tableId',
@@ -57,6 +77,14 @@ tableRouter.patch(
   '/:restaurantId/table/:tableId/occupancy',
   authenticateJWTToken,
   updateTableOccupancy
+);
+
+// update table occupancy by table number and restaurantSlug
+
+tableRouter.patch(
+  '/slug/:restaurantSlug/table/:tableNumber/occupancy',
+  authenticateJWTToken,
+  updateTableOccupancyByTableNumber
 );
 
 // Delete a table

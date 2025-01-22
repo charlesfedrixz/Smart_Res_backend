@@ -1,6 +1,8 @@
 require('dotenv').config();
 
 const http = require('http');
+const https = require('node:https');
+const fs = require('node:fs');
 const express = require('express');
 const app = express();
 const { Server } = require('socket.io');
@@ -34,12 +36,13 @@ app.use(express.static('uploads'));
 // CORS configuration
 app.use(
   cors({
-    origin: [
-      'https://localhost:5173',
-      'https://localhost:5175',
-      'https://achaathak.com',
-      'https://www.achaathak.com',
-    ], // Specify allowed origins
+    origin: true, // Allow all origins
+    // origin: [
+    //   'https://localhost:5173',
+    //   'https://localhost:5175',
+    //   'https://achaathak.com',
+    //   'https://www.achaathak.com',
+    // ], // Specify allowed origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     // allowedHeaders: ['Content-Type', 'Authorization'],
@@ -62,7 +65,14 @@ app.use('/api/table', tableRouter);
 // To handle all the errors
 app.use(errorHandler);
 
-const server = http.createServer(app);
+// const server = http.createServer(app);
+const options = {
+  key: fs.readFileSync('./certificates/localhost-key.pem'),
+  cert: fs.readFileSync('./certificates/localhost.pem'),
+};
+
+const server = https.createServer(options, app);
+
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -129,11 +139,15 @@ app.get('/', (req, res) => {
   });
 });
 
-// Port configuration
+// // Port configuration
 const PORT = process.env.PORT || 4000;
 
+// server.listen(PORT, () => {
+// 	console.log(
+// 		`Server of your Smart Restaurant is running on http://localhost:${PORT}`,
+// 	);
+// });
+
 server.listen(PORT, () => {
-  console.log(
-    `Server of your Smart Restaurant is running on http://localhost:${PORT}`
-  );
+  console.log(`Server is running on port ${PORT}`);
 });
