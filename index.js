@@ -1,7 +1,10 @@
 require('dotenv').config();
 
 const http = require('http');
+const https = require('node:https');
+const fs = require('node:fs');
 const express = require('express');
+const app = express();
 const { Server } = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -20,8 +23,9 @@ const {
   updateOrderPaymentBySocket,
 } = require('./controller/orderController');
 const restaurantRoute = require('./routes/restaurantRoute');
-
-const app = express();
+const { checkIfAuthorizedByJWT } = require('./middleware/authenticateJWTToken');
+const { errorHandler } = require('./utils/errorHandler');
+const tableRouter = require('./routes/tableRoutes');
 
 // Middleware
 app.use(express.json());
@@ -32,28 +36,22 @@ app.use(express.static('uploads'));
 // CORS configuration
 app.use(
   cors({
-    origin: '*',
+    origin: true, // Allow all origins
+    // origin: [
+    //   'https://localhost:5173',
+    //   'https://localhost:5175',
+    //   'https://achaathak.com',
+    //   'https://www.achaathak.com',
+    // ], // Specify allowed origins
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    // allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
-  );
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  next();
-});
-
-// Increase payload size limits
-// app.use(bodyParser.json({ limit: '100mb' }));
-// app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
-
-// Database connection
 connectDB();
 
+// protected routes with jwt
 app.use('/api/admin', adminRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/food', foodRoutes);
@@ -62,10 +60,19 @@ app.use('/api/order', orderRoutes.order);
 app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
+app.use('/api/table', tableRouter);
 
+// To handle all the errors
+app.use(errorHandler);
 
-// Server setup
-const server = http.createServer(app);
+// const server = http.createServer(app);
+const options = {
+  key: fs.readFileSync('./certificates/localhost-key.pem'),
+  cert: fs.readFileSync('./certificates/localhost.pem'),
+};
+
+const server = https.createServer(options, app);
+
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -77,6 +84,8 @@ const io = new Server(server, {
   transports: ['websocket', 'polling'],
   secure: true,
 });
+
+app.set('io', io);
 
 // Socket.IO event handlers
 io.on('connection', (socket) => {
@@ -130,11 +139,15 @@ app.get('/', (req, res) => {
   });
 });
 
-// Port configuration
+// // Port configuration
 const PORT = process.env.PORT || 4000;
 
+// server.listen(PORT, () => {
+// 	console.log(
+// 		`Server of your Smart Restaurant is running on http://localhost:${PORT}`,
+// 	);
+// });
+
 server.listen(PORT, () => {
-  console.log(
-    `Server of your Smart Restaurant is running on http://localhost:${PORT}`
-  );
+  console.log(`Server is running on port ${PORT}`);
 });

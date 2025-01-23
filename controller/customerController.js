@@ -1,307 +1,388 @@
-const asyncHandler = require("express-async-handler");
-const customer = require("../models/customerModel");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const twilio = require("twilio");
-const getUserData = require("../middleware/authUser");
-const Restaurant = require("../models/restaurantModel");
+const asyncHandler = require('express-async-handler');
+const Customer = require('../models/customerModel');
+const Table = require('../models/tableModel');
+const jwt = require('jsonwebtoken');
+const twilio = require('twilio');
+const Restaurant = require('../models/restaurantModel');
 
-const countryCode = "+91";
-const generateOTP = () => {
-  return crypto.randomInt(100000, 999999).toString();
-};
-const accountSid = process.env.TWILIO_ACCOUNT_SID; // Your Account SID from www.twilio.com/console
-const authToken = process.env.TWILIO_AUTH_TOKEN; // Your Auth Token from www.twilio.com/console
-const client = twilio(accountSid, authToken);
+const COUNTRY_CODE = '+91';
+const OTP_EXPIRY_MINUTES = 5;
+const JWT_EXPIRY = '5h';
 
-async function sendOTPSMS(restaurantNumber, otp) {
+// Initialize Twilio client
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
+async function sendOTPSMS(phoneNumber) {
   try {
-    console.log("phone:", restaurantNumber);
-    const formattedPhoneNumber = `${countryCode}${restaurantNumber.replace(
+    const formattedPhoneNumber = `${COUNTRY_CODE}${phoneNumber.replace(
       /\D/g,
-      ""
+      ''
     )}`;
-    const message = await client.messages.create({
-      body: `Smart Restaurant verification OTP code: ${otp}.
-              Code is valid for 5 minutes.
-               - Smart Restaurant Team `,
-      from: process.env.TWILIO_PHONE_NUMBER, // Your Twilio phone number
-      to: formattedPhoneNumber,
-    });
-    console.log(`Message sent: ${message.sid}`);
+
+    // Send verification code using Twilio Verify service
+    const verification = await twilioClient.verify.v2
+      .services(process.env.TWILIO_SERVICE_SID)
+      .verifications.create({
+        to: formattedPhoneNumber,
+        channel: 'sms',
+      });
+
+    console.log(`Verification initiated. Status: ${verification.status}`);
+    return true;
   } catch (error) {
-    console.error("Error in sending otp", error);
+    console.error('Failed to send OTP SMS:', error);
+    return false;
   }
 }
+
+async function verifyOTP(phoneNumber, code) {
+  try {
+    const formattedPhoneNumber = `${COUNTRY_CODE}${phoneNumber.replace(
+      /\D/g,
+      ''
+    )}`;
+
+    const verificationCheck = await twilioClient.verify.v2
+      .services(process.env.TWILIO_SERVICE_SID)
+      .verificationChecks.create({
+        to: formattedPhoneNumber,
+        code: code,
+      });
+
+    return verificationCheck.status === 'approved';
+  } catch (error) {
+    console.error('Failed to verify OTP:', error);
+    return false;
+  }
+}
+
 const resendOtp = asyncHandler(async (req, res) => {
-  try {
-    const { mobileNumber } = req.body;
-    if (!mobileNumber) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide a mobile number." });
-    }
-    const user = await customer.findOne({
-      mobileNumber,
+  const { mobileNumber } = req.body;
+  const { restaurantId } = req.params;
+
+  if (!mobileNumber) {
+    return res.status(400).json({
+      success: false,
+      message: 'Mobile number is required',
     });
-    if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found." });
-    }
-    const otp = generateOTP();
-    user.isVerified = false;
-    user.otp = otp;
-    user.otpExpire = Date.now() + 1000 * 60 * 5;
-    await user.save();
-    await sendOTPSMS(mobileNumber, otp);
-    return res
-      .status(200)
-      .json({ success: true, user, message: "Resend OTP with success." });
-  } catch (error) {
-    console.error("Error sending SMS:", error);
-    return res.status(500).json({ success: false, message: "Server Error" });
   }
+
+  const user = await Customer.findOne({
+    mobileNumber,
+    restaurantId,
+  });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'Customer not found',
+    });
+  }
+
+  const restaurant = await Restaurant.findById(restaurantId);
+  if (!restaurant) {
+    return res.status(404).json({
+      success: false,
+      message: 'Restaurant not found',
+    });
+  }
+
+  user.otpExpire = Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000;
+  user.isVerified = false;
+
+  await user.save();
+
+  const smsSent = await sendOTPSMS(restaurant?.contact?.phone);
+  if (!smsSent) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send OTP',
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'OTP resent successfully',
+  });
 });
+
 const deleteAccount = asyncHandler(async (req, res) => {
-  try {
-    const { currentTableNumber } = req.body;
+  const { customerId, restaurantId } = req.params;
 
-    const user = await customer.findOne({
-      currentTableNumber,
-    });
-    if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User not found." });
-    }
-    await customer.updateOne(
-      { _id: user._id },
-      { $set: { isLoggedIn: false } }
-    );
-    await customer.deleteOne({ _id: user._id });
+  const user = await Customer.findOne({
+    _id: customerId,
+    restaurantId,
+  });
 
-    return res.status(200).json({
-      success: true,
-      message: "Your Account logout successfully.",
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'Customer not found',
     });
-  } catch (error) {
-    console.error(error.message);
-    return res.status(500).json({ success: false, message: "Server Error" });
   }
+
+  // Update associated table if exists
+  if (user.tableId) {
+    await Table.findByIdAndUpdate(user.tableId, {
+      $set: { isOccupied: false },
+    });
+  }
+
+  await user.deleteOne();
+
+  return res.status(200).json({
+    success: true,
+    message: 'Account deleted successfully',
+  });
 });
 
-const OtpVerify = async (req, res) => {
-  try {
-    const { name, otp } = req.body;
-    console.log("Data:", name, otp);
+const OtpVerify = asyncHandler(async (req, res) => {
+  const { otp, mobileNumber } = req.body;
+  const { restaurantId, tableId } = req.params;
 
-    if (!name || !otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide the field." });
-    }
-    const findCustomer = await customer.findOne({ name });
-    if (!findCustomer) {
-      return res
-        .status(200)
-        .json({ success: false, message: "Customer not found" });
-    }
-    if (findCustomer.otp !== otp) {
-      return res.status(400).json({ success: false, message: "Invalid OTP." });
-    }
-    if (findCustomer.otpExpire < Date.now()) {
-      return res.status(400).json({ success: false, message: "Expired OTP." });
-    }
-    console.log("otp:", findCustomer.otp);
-    const findRestaurant = await Restaurant.findById(findCustomer.restaurant);
-    findCustomer.isVerified = true;
-    findCustomer.isLoggedIn = true;
-    findCustomer.otp = undefined;
-    findCustomer.otpExpire = undefined;
-    await findCustomer.save();
-
-    const payload = {
-      user: {
-        id: findCustomer._id,
-        name: findCustomer.name,
-        restaurant: findRestaurant.name,
-      },
-    };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "5h",
+  if (!otp || !mobileNumber) {
+    return res.status(400).json({
+      success: false,
+      message: 'OTP and mobile number are required',
     });
-    return res.status(200).json({
-      success: true,
-      token,
-      Data: {
-        Restaurant: findRestaurant.name,
-        Table_No: findCustomer.currentTableNumber,
-      },
-      message: "OTP verified with success",
-    });
-  } catch (error) {
-    console.error("Error in verifying otp", error);
-    return res.status(400).json({ success: false, message: "Server Error" });
   }
-};
+
+  const customer = await Customer.findOne({
+    mobileNumber,
+    restaurantId,
+  });
+
+  if (!customer) {
+    return res.status(404).json({
+      success: false,
+      message: 'Customer not found',
+    });
+  }
+
+  const restaurant = await Restaurant.findById(restaurantId);
+  if (!restaurant) {
+    return res.status(404).json({
+      success: false,
+      message: 'Restaurant not found',
+    });
+  }
+
+  if (customer.otpExpire < Date.now()) {
+    return res.status(400).json({
+      success: false,
+      message: 'OTP has expired',
+    });
+  }
+
+  const isValidOTP = await verifyOTP(restaurant?.contact?.phone, otp);
+  if (!isValidOTP) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid OTP',
+    });
+  }
+
+  customer.isVerified = true;
+  customer.isLoggedIn = true;
+  customer.otpExpire = undefined;
+  customer.tableId = tableId;
+
+  await customer.save();
+
+  // Update table status
+  await Table.findByIdAndUpdate(tableId, {
+    $set: { isOccupied: true },
+  });
+
+  const token = jwt.sign(
+    {
+      customerId: customer._id,
+      restaurantId: restaurant._id,
+      tableId,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: JWT_EXPIRY }
+  );
+
+  // set the token in the cookie
+  res.cookie('jwt', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  });
+
+  console.log('CHECK', customer._id);
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      restaurantId: restaurant._id,
+      customerId: customer._id,
+      tableId,
+    },
+  });
+});
 
 const Register = asyncHandler(async (req, res) => {
-  try {
-    const { mobileNumber, currentTableNumber, name, guest, restaurant } =
-      req.body;
-    if (
-      !mobileNumber ||
-      !currentTableNumber ||
-      !name ||
-      !guest ||
-      !restaurant
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide a require fields" });
-    }
-    const customerFind = await customer.findOne({ mobileNumber });
-    if (
-      customerFind &&
-      customerFind.currentTableNumber != currentTableNumber &&
-      customerFind.isVerified
-    ) {
-      return res.status(400).json({
-        success: false,
-        token: null,
-        message: "Table's occupied by another customer try a new table",
-      });
-    }
-    if (customerFind && !customerFind.isVerified) {
-      const otp = generateOTP();
-      customerFind.otp = otp;
-      customerFind.otpExpire = Date.now() + 1000 * 60 * 5; // Reset OTP expiry time
-      await customerFind.save();
+  const { mobileNumber, name, numberOfGuests } = req.body;
+  const { restaurantId, tableId } = req.params;
 
-      //send otp function
-      await sendOTPSMS(mobileNumber, otp);
-      console.log("OTP resent to unverified customer");
-
-      return res.status(200).json({
-        success: true,
-        token: null,
-        message: "OTP is sent again for unverified customer",
-      });
-    }
-    if (
-      customerFind &&
-      customerFind.currentTableNumber == currentTableNumber &&
-      customerFind.isVerified
-    ) {
-      const otp = generateOTP();
-      customerFind.currentTableNumber = currentTableNumber;
-      customerFind.otp = otp;
-      customerFind.otpExpire = Date.now() + 1000 * 60 * 5;
-      customerFind.isLoggedIn = true;
-      await customerFind.save();
-      //send otp function
-      await sendOTPSMS(mobileNumber, otp);
-      console.log("existing number");
-      return res.status(200).json({
-        success: true,
-        token: null,
-        message: "OTP is send and register with success for existing user ",
-      });
-    }
-
-    if (!customerFind) {
-      const otp = generateOTP();
-      const newCustomer = await customer.create({
-        mobileNumber: mobileNumber,
-        currentTableNumber: currentTableNumber,
-        otp: otp,
-        otpExpire: Date.now() + 1000 * 60 * 5,
-        isLoggedIn: false,
-      });
-
-      //send otp function
-      await sendOTPSMS(mobileNumber, otp);
-      console.log("new number");
-
-      return res.status(200).json({
-        success: true,
-        Data: newCustomer.mobileNumber,
-        token: null,
-        message: "Register a new customer and OTP is send with success",
-      });
-    }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: true, message: "Server Error" });
+  if (!mobileNumber) {
+    return res.status(400).json({
+      success: false,
+      message: 'Mobile number is required',
+    });
   }
+
+  // Validate table availability
+  const table = await Table.findOne({
+    _id: tableId,
+    restaurantId,
+    isOccupied: false,
+  });
+
+  if (!table) {
+    return res.status(400).json({
+      success: false,
+      message: 'Table is not available',
+    });
+  }
+
+  let existingCustomer = await Customer.findOne({
+    mobileNumber,
+    restaurantId,
+  });
+
+  const restaurant = await Restaurant.findById(restaurantId);
+
+  if (!restaurant) {
+    return res.status(404).json({
+      success: false,
+      message: 'Restaurant not found',
+    });
+  }
+
+  if (existingCustomer) {
+    existingCustomer.tableId = tableId;
+    existingCustomer.numberOfGuests = numberOfGuests || 1;
+    if (name) existingCustomer.name = name;
+    existingCustomer.isVerified = true;
+    await existingCustomer.save();
+  } else {
+    existingCustomer = await Customer.create({
+      restaurantId,
+      tableId,
+      name: name || '',
+      mobileNumber,
+      numberOfGuests: numberOfGuests || 1,
+      isVerified: true,
+    });
+  }
+
+  // verify OTP
+  await sendOTPSMS(restaurant?.contact?.phone);
+
+  return res.status(200).json({
+    success: true,
+    message: 'OTP sent successfully',
+  });
 });
 
 const login = asyncHandler(async (req, res) => {
-  try {
-    const { restaurant } = req.params;
+  const { mobileNumber } = req.body;
+  const { restaurantId, tableId } = req.params;
 
-    const { phone, currentTableNumber, name, guest } = req.body;
-    console.log("name:", restaurant, phone, currentTableNumber, name, guest);
-    if (!phone || !currentTableNumber || !name || !guest || !restaurant) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide a require fields" });
-    }
-
-    const findRestaurant = await Restaurant.findOne({ name: restaurant });
-    if (!findRestaurant) {
-      return res
-        .status(400)
-        .json({ success: false, message: `${Restaurant} not found` });
-    }
-    const restaurantNumber = findRestaurant.contact.phone;
-    const customerFind = await customer.findOne({ name });
-    if (!customerFind) {
-      const otp = generateOTP();
-      //send otp function
-      await sendOTPSMS(restaurantNumber, otp);
-      const newCustomer = await customer.create({
-        name,
-        currentTableNumber,
-        guest,
-        phone,
-        restaurant: findRestaurant._id,
-        otp: otp,
-        otpExpire: Date.now() + 1000 * 60 * 5, //5 minutes
-      });
-      return res.status(201).json({
-        success: "true",
-        message: "New customer cerated successfully.",
-        Data: {
-          OTP: otp,
-          Table_No: newCustomer.currentTableNumber,
-          numberOfGuest: newCustomer.guest,
-          Restaurant: findRestaurant.name,
-        },
-      });
-    }
-    if (!customerFind.isVerified) {
-      const otp = generateOTP();
-      customerFind.otp = otp;
-      customerFind.otpExpire = Date.now() + 1000 * 60 * 5;
-      customerFind.save();
-      await sendOTPSMS(restaurantNumber, otp);
-      return res.status(200).json({
-        success: "true",
-        Data: { OTP: otp },
-        message: "Customer otp is send.",
-      });
-    }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: true, message: "Server Error" });
+  if (!mobileNumber) {
+    return res.status(400).json({
+      success: false,
+      message: 'Mobile number is required',
+    });
   }
+
+  const customer = await Customer.findOne({
+    mobileNumber,
+    restaurantId,
+  });
+
+  if (!customer) {
+    return res.status(404).json({
+      success: false,
+      message: 'Customer not found',
+    });
+  }
+
+  const restaurant = await Restaurant.findById(restaurantId);
+  if (!restaurant) {
+    return res.status(404).json({
+      success: false,
+      message: 'Restaurant not found',
+    });
+  }
+
+  customer.otpExpire = Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000;
+  customer.tableId = tableId;
+  customer.isVerified = false;
+
+  await customer.save();
+
+  const smsSent = await sendOTPSMS(restaurant?.contact?.phone);
+  if (!smsSent) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send OTP',
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'OTP sent successfully',
+  });
 });
+
+const getAllCustomers = asyncHandler(async (req, res) => {
+  const customers = await Customer.find();
+  return res.status(200).json({
+    success: true,
+    data: customers,
+  });
+});
+
+const getCustomerById = asyncHandler(async (req, res) => {
+  const { customerId } = req.params;
+  const customer = await Customer.findById(customerId);
+  return res.status(200).json({
+    success: true,
+    data: customer,
+  });
+});
+
+const logout = asyncHandler(async (req, res) => {
+  res.cookie('jwt', '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 0,
+    expires: new Date(0),
+    path: '/',
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: 'Logout successful',
+  });
+});
+
 module.exports = {
-  resendOtp: resendOtp,
-  deleteAccount: deleteAccount,
-  OtpVerify: OtpVerify,
-  Register: Register,
-  login: login,
+  resendOtp,
+  deleteAccount,
+  OtpVerify,
+  Register,
+  login,
+  getAllCustomers,
+  getCustomerById,
+  logout,
 };

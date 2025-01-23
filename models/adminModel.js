@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
   {
@@ -13,32 +13,35 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
       validate: {
-        validator: function (v) {
-          return /^\S+@(gmail\.com|org\.in|gov\.in|edu\.in|example\.org)$/.test(
-            v
-          );
-        },
+        validator: (v) =>
+          /^\S+@(gmail\.com|org\.in|gov\.in|edu\.in|example\.org)$/.test(v),
         message: (props) => `${props.value} is not a valid email address.`,
       },
     },
     password: {
       type: String,
       required: true,
-      minilength: [6, "minimum password length is 6...."],
+      minilength: [6, 'minimum password length is 6....'],
     },
 
     role: {
       type: String,
       required: true,
-      enum: ["Restaurant_Admin", "Super_Admin"],
+      enum: ['Restaurant_Admin', 'Super_Admin'],
     },
     restaurant: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Restaurant",
+      ref: 'Restaurant',
       default: null, // Default to null for SUPER_ADMIN
     },
     permissions: {
-      type: [String],
+      type: [
+        {
+          title: String,
+          url: String,
+          icon: String,
+        },
+      ],
       default: [],
     },
     otp: {
@@ -61,5 +64,5 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.model('User', userSchema);
 module.exports = User;

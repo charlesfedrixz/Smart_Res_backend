@@ -1,22 +1,58 @@
-const express = require("express");
+const express = require('express');
 const {
   createCategory,
   getCategory,
   removeCategory,
   updateCategory,
-  categorySingle,
-} = require("../controller/categoryController");
+  createSubcategory,
+  removeSubcategory,
+  updateSubcategory,
+  getAllSubcategories,
+} = require('../controller/categoryController');
+const { authenticateJWTToken } = require('../middleware/authenticateJWTToken');
 
-const categoryRoutes = express.Router();
-categoryRoutes.post("/create/:restaurant", createCategory); // header token, query category
-categoryRoutes.get("/list/:restaurant", getCategory); // header token,  params restaurantname
-categoryRoutes.delete(
-  "/remove/:restaurant/:category/:subcategoryName?",
+const categoryRouter = express.Router();
+categoryRouter.post(
+  '/create/category/:restaurantId',
+  authenticateJWTToken,
+  createCategory
+); // header token, query category
+
+categoryRouter.post(
+  '/create/subcategory/:restaurantId',
+  authenticateJWTToken,
+  createSubcategory
+);
+
+// * anyone can access
+categoryRouter.get('/list/:restaurantId', getCategory); // header token,  params restaurantname
+
+categoryRouter.delete(
+  '/delete/category/:restaurantId/:categoryId',
+  authenticateJWTToken,
   removeCategory
 ); // header token, params categoryid
-categoryRoutes.put("/update", updateCategory); // header token, body category and restaurant
-categoryRoutes.get("/list/:restaurant/:category", categorySingle); // header token, body category and restaurant
+
+categoryRouter.delete(
+  '/delete/subcategory/:restaurantId/:categoryId/:subcategoryName',
+  authenticateJWTToken,
+  removeSubcategory
+); // header token, params categoryid and subcategoryid
+categoryRouter.put(
+  '/update/category/:restaurantId/:categoryId',
+  authenticateJWTToken,
+  updateCategory
+); // header token, body category and restaurant
+
+categoryRouter.put(
+  '/update/subcategory/:restaurantId/:categoryId/:subcategoryName',
+  authenticateJWTToken,
+  updateSubcategory
+); // header token, body category and restaurant
+
+// list all subcategory
+categoryRouter.get('/list/:restaurantId/:categoryId', getAllSubcategories); // header token, body category and restaurant
 
 module.exports = {
-  categoryRoutes: categoryRoutes,
+  categoryRoutes: categoryRouter,
 };

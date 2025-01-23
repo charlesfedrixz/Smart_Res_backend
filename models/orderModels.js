@@ -1,16 +1,32 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
+
 const orderSchema = new mongoose.Schema(
   {
+    restaurantId: {
+      type: mongoose.Types.ObjectId,
+      ref: 'Restaurant',
+      required: true,
+    },
+    tableId: {
+      type: mongoose.Types.ObjectId,
+      ref: 'Table',
+      required: true,
+    },
     customerId: {
       type: mongoose.Types.ObjectId,
-      ref: "Customers",
+      ref: 'Customers',
       required: true,
     },
     foodItems: [
       {
-        foodId: { type: mongoose.Types.ObjectId, ref: "Food", required: true },
+        foodId: { type: mongoose.Types.ObjectId, ref: 'Food', required: true },
         quantity: { type: Number, min: 1, required: true },
         isNewItem: { type: Boolean, default: false },
+        status: {
+          type: String,
+          enum: ['Pending', 'Preparing', 'Ready', 'Served'],
+          default: 'Pending',
+        },
       },
     ],
     totalAmount: { type: Number, required: true },
@@ -18,81 +34,83 @@ const orderSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ["Preparing", "Ready", "Processing", "Completed"],
-      default: "Processing",
+      enum: ['Preparing', 'Ready', 'Processing', 'Completed'],
+      default: 'Processing',
     },
-
     isRated: { type: Boolean, default: false },
     payment: {
       type: String,
       required: true,
-      enum: ["Paid", "Unpaid"],
-      default: "Unpaid",
+      enum: ['Paid', 'Unpaid'],
+      default: 'Unpaid',
     },
     paymentMode: {
       type: String,
-      enum: ["Online", "Offline"],
-      default: "Offline",
+      enum: ['Cash', 'Online', 'Card'],
+      default: 'Cash',
     },
   },
   { timestamps: true }
 );
 
 orderSchema.methods.calculateTotalAmount = async function () {
-  await this.populate("foodItems.foodId");
+  await this.populate('foodItems.foodId');
 
   let totalAmount = 0;
+  let newItemsTotal = 0;
 
   for (const item of this.foodItems) {
-    // const food = await Food.findById(item.foodId);
     if (!item.foodId) {
-      return {
-        success: false,
-        message: `Food item with ID ${item.foodId} not found.`,
-      };
+      throw new Error('Food item not found');
     }
-    totalAmount += item.foodId.price * item.quantity;
+    const itemTotal = item.foodId.price * item.quantity;
+    totalAmount += itemTotal;
+
+    if (item.isNewItem) {
+      newItemsTotal += itemTotal;
+    }
   }
+
   this.totalAmount = totalAmount;
+  this.newItemsTotalAmount = newItemsTotal;
+  await this.save();
+
   return {
     success: true,
-    message: `Calculate Total Amount  Successfully`,
+    message: 'Total amount calculated successfully',
   };
 };
 
-orderSchema.methods.updatePaymentMode = async function (payment_mode) {
-  switch (payment_mode) {
-    case "Cash":
-      this.payment_mode = "Cash";
-      break;
-    case "Online":
-      this.payment_mode = "Online";
-      break;
-    default:
-      this.payment_mode = "Cash";
+orderSchema.methods.updatePaymentMode = async function (paymentMode) {
+  const validModes = ['Cash', 'Online', 'Card'];
+
+  if (!validModes.includes(paymentMode)) {
+    throw new Error(`Invalid payment mode: ${paymentMode}`);
   }
-  await this.save();
-};
-orderSchema.methods.updateStatusPayment = async function (paid) {
-  if (paid) {
-    this.payment = "Paid";
-  } else this.payment = "Unpaid";
+
+  this.paymentMode = paymentMode;
   await this.save();
 };
 
-orderSchema.methods.updateStatusOrder = async function (newStatus) {
-  const validStatuses = ["Preparing", "Ready", "Processing", "Completed"];
+orderSchema.methods.updatePaymentStatus = async function (paid) {
+  this.payment = paid ? 'Paid' : 'Unpaid';
+  await this.save();
+};
+
+orderSchema.methods.updateOrderStatus = async function (newStatus) {
+  const validStatuses = ['Preparing', 'Ready', 'Processing', 'Completed'];
 
   if (!validStatuses.includes(newStatus)) {
-    throw new Error(`Invalid status: ${newStatus}`);
+    throw new Error(`Invalid order status: ${newStatus}`);
   }
 
   this.status = newStatus;
   await this.save();
 };
-//order expire after 7 days
-orderSchema.index({ created: 1 }), { expireAfterSeconds: 7 * 24 * 60 * 60 };
 
-const Order = mongoose.model("Order", orderSchema);
+// Orders expire after 7 days from createdAt
+// orderSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
+
+const Order = mongoose.model('Order', orderSchema);
 
 module.exports = Order;
