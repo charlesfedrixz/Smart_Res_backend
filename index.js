@@ -69,15 +69,17 @@ const options = {
   cert: fs.readFileSync('./certificates/localhost.pem'),
 };
 
-let server;
+// let server;
 
-if (process.env.NODE_ENV !== 'production') {
-  console.log('Running in development mode');
-  server = https.createServer(options, app);
-} else {
-  console.log('Running in production mode');
-  server = http.createServer(app);
-}
+// if (process.env.NODE_ENV !== 'production') {
+//   console.log('Running in development mode');
+//   server = https.createServer(options, app);
+// } else {
+//   console.log('Running in production mode');
+//   server = http.createServer(app);
+// }
+
+const server = https.createServer(options, app);
 
 const io = new Server(server, {
   cors: {
