@@ -5,6 +5,8 @@ const express = require('express');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const https = require('node:https');
+const fs = require('node:fs');
 // const bodyParser = require('body-parser');
 
 const connectDB = require('./config/db');
@@ -63,8 +65,23 @@ app.use('/api/pay', payments);
 app.use('/api/invoice', invoiceRoute);
 app.use('/api/restaurant', restaurantRoute);
 
+// only dev
+const options = {
+  key: fs.readFileSync('./certificates/localhost-key.pem'),
+  cert: fs.readFileSync('./certificates/localhost.pem'),
+};
+
+let server;
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Running in development mode');
+  server = https.createServer(options, app);
+} else {
+  console.log('Running in production mode');
+  server = http.createServer(app);
+}
 // Server setup
-const server = http.createServer(app);
+// const server = https.createServer(options, app);
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -133,7 +150,5 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, () => {
-  console.log(
-    `Server of your Smart Restaurant is running on http://localhost:${PORT}`
-  );
+  console.log(`Server of your Smart Restaurant is running on ${PORT}`);
 });
