@@ -3,7 +3,20 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const encodedUrl = encodeURI(process.env.MONGODB_URL);
-    const conn = await mongoose.connect(encodedUrl);
+    const conn = await mongoose.connect(encodedUrl, {
+      // Modern options for Node.js 18+
+      serverSelectionTimeoutMS: 30000, // Increased timeout
+      socketTimeoutMS: 45000,
+      family: 4, // Use IPv4, skip trying IPv6
+      ssl: true,
+      tls: true,
+      tlsAllowInvalidCertificates: true,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 30000,
+      retryWrites: true,
+      w: 'majority',
+    });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
