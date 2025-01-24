@@ -1,37 +1,17 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI/CD
-
+name: Deploy Smart Restaurant Backend
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-
+  push: 
+    branches: [ "main" ]
 jobs:
-  build:
+  deploy:
     runs-on: self-hosted
-
-    strategy:
-      matrix:
-        node-version: [23.x]
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-
-      - name: Install dependencies with increased memory
-        run: node --max-old-space-size=4096 $(which npm) install
-
-      - name: Touch .env and set environment variable
+          node-version: 20
+      - run: npm i
+      - name: Start/Restart PM2
         run: |
-          echo "${{ secrets.PROD_ENV_FILE }}" > .env
-
-      # - name: Restart application using PM2
-      #   run: pm2 restart smart-restaurant
+           pm2 delete smart-restaurant-backend || true
+           pm2 start ~/pm2-configs/production/smart-restaurant-backend.ecosystem.config.js
