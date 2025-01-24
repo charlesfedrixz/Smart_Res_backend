@@ -71,7 +71,15 @@ const options = {
   cert: fs.readFileSync('./certificates/localhost.pem'),
 };
 
-const server = https.createServer(options, app);
+let server;
+
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Running in development mode');
+  server = https.createServer(options, app);
+} else {
+  console.log('Running in production mode');
+  server = http.createServer(app);
+}
 
 const io = new Server(server, {
   cors: {
@@ -139,14 +147,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// // Port configuration
 const PORT = process.env.PORT || 4000;
-
-// server.listen(PORT, () => {
-// 	console.log(
-// 		`Server of your Smart Restaurant is running on http://localhost:${PORT}`,
-// 	);
-// });
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
