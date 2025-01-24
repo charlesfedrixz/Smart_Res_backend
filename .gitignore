@@ -4,3 +4,4 @@ node_modules
 cred.json
 uploads/*
 endpoints.js
+smart-restaurant-backend.ecosystem.config.js
