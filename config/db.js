@@ -54,9 +54,6 @@ const connectDB = async () => {
       code: error.code,
       reason: error.reason,
     });
-    // Log connection URL for debugging (remove sensitive info)
-    const sanitizedUrl = process.env.MONGODB_URL.replace(/:([^@]+)@/, ':****@');
-    console.log('Connection URL:', sanitizedUrl);
     throw error;
   }
 };
