@@ -49,8 +49,6 @@ app.use(
   })
 );
 
-connectDB();
-
 // protected routes with jwt
 app.use('/api/admin', adminRoutes);
 app.use('/api/category', categoryRoutes);
@@ -146,6 +144,8 @@ app.get('/', (req, res) => {
     message: 'Server of your Smart Restaurant is running...',
   });
 });
+
+connectDB();
 
 const PORT = process.env.PORT || 4000;
 
